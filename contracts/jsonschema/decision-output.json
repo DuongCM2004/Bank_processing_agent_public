@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/decision-output.json",
+  "title": "DecisionOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "decision_run_id", "route", "decision_type", "status", "confidence", "requires_human_review", "reason_codes", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "decision_run_id": { "type": "string" },
+    "route": { "type": "string", "enum": ["auto_process", "cross_check", "human_review", "specialist_escalation", "manual_intake_resolution"] },
+    "decision_type": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "blocked", "needs_review"] },
+    "confidence": { "$ref": "confidence.json" },
+    "requires_human_review": { "type": "boolean" },
+    "reason_codes": { "type": "array", "items": { "type": "string" } },
+    "next_action": { "type": ["string", "null"] },
+    "rationale": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "$ref": "evidence-ref.json" } },
+    "pending_critical_checks": { "type": "array", "items": { "type": "string" } },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/evidence-ref.json",
+  "title": "EvidenceRef",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_id"],
+  "properties": {
+    "document_id": { "type": "string" },
+    "document_version_id": { "type": ["string", "null"] },
+    "document_page_id": { "type": ["string", "null"] },
+    "artifact_id": { "type": ["string", "null"] },
+    "page_number": { "type": ["integer", "null"], "minimum": 1 },
+    "text_span": { "type": ["string", "null"] },
+    "bbox": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "required": ["x", "y", "width", "height"]
+    },
+    "evidence_rank": { "type": "integer", "minimum": 1 }
+  }
+}

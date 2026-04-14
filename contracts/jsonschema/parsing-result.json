@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/parsing-result.json",
+  "title": "ParsingResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "document_id", "layout_result_id", "status", "artifact_id", "regions", "confidence", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "document_id": { "type": "string" },
+    "document_version_id": { "type": ["string", "null"] },
+    "layout_result_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "failed", "needs_review", "insufficient_evidence"] },
+    "artifact_id": { "type": "string" },
+    "confidence": { "$ref": "confidence.json" },
+    "regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["region_id", "region_type", "page_number", "bbox"],
+        "properties": {
+          "region_id": { "type": "string" },
+          "region_type": { "type": "string" },
+          "page_number": { "type": "integer", "minimum": 1 },
+          "bbox": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          },
+          "confidence": {
+            "oneOf": [
+              { "$ref": "confidence.json" },
+              { "type": "null" }
+            ]
+          },
+          "linked_ocr_block_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

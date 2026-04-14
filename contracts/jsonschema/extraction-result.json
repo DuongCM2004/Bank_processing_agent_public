@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/extraction-result.json",
+  "title": "ExtractionResult",
+  "type": "object",
+  "allOf": [
+    { "$ref": "extraction-output.json" }
+  ]
+}

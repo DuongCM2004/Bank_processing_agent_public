@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/version-refs.json",
+  "title": "VersionRefs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "workflow_definition_version": { "type": ["string", "null"] },
+    "schema_version": { "type": "string" },
+    "rule_pack_version": { "type": ["string", "null"] },
+    "ocr_model_version": { "type": ["string", "null"] },
+    "classifier_model_version": { "type": ["string", "null"] },
+    "prompt_version": { "type": ["string", "null"] },
+    "preprocess_profile_version": { "type": ["string", "null"] },
+    "producer_version": { "type": ["string", "null"] }
+  }
+}

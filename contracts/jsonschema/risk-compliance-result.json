@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/risk-compliance-result.json",
+  "title": "RiskComplianceResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "compliance_evaluation_id", "compliance_status", "status", "control_results", "requires_human_review", "escalation_recommendation", "reason_codes", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "compliance_evaluation_id": { "type": "string" },
+    "compliance_status": {
+      "type": "string",
+      "enum": ["pending", "completed_pass", "completed_fail", "review_required", "partial_compliance", "non_compliant"]
+    },
+    "status": { "type": "string", "enum": ["completed", "failed", "needs_review"] },
+    "requires_human_review": { "type": "boolean" },
+    "escalation_recommendation": { "type": ["string", "null"] },
+    "reason_codes": { "type": "array", "items": { "type": "string" } },
+    "control_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["control_id", "status"],
+        "properties": {
+          "control_id": { "type": "string" },
+          "status": { "type": "string" },
+          "severity": { "type": ["string", "null"] },
+          "reason_code": { "type": ["string", "null"] },
+          "external_ref": { "type": ["string", "null"] },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "$ref": "evidence-ref.json" }
+          }
+        }
+      }
+    },
+    "risk_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_type", "severity", "reason_code", "summary"],
+        "properties": {
+          "finding_type": { "type": "string" },
+          "severity": { "type": "string" },
+          "reason_code": { "type": "string" },
+          "summary": { "type": "string" },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "$ref": "evidence-ref.json" }
+          }
+        }
+      }
+    },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

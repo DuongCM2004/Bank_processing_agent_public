@@ -1,0 +1,956 @@
+openapi: 3.1.0
+info:
+  title: Ops Agent API
+  version: 1.1.0-draft
+  summary: Banking-grade document processing API for cases, review, decisions, and audit.
+  description: |
+    Draft OpenAPI contract for the banking Document Processing Agent.
+    The API is case-centric, workflow-safe, explicitly asynchronous, and designed for
+    frontend reviewers plus internal orchestration services.
+servers:
+  - url: https://api.ops-agent.bank.local
+    description: Production
+  - url: https://staging-api.ops-agent.bank.local
+    description: Staging
+  - url: http://localhost:8000
+    description: Local development
+tags:
+  - name: System
+  - name: Cases
+  - name: Documents
+  - name: Processing
+  - name: Decisions
+  - name: Review
+  - name: Audit
+  - name: Internal
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: healthCheck
+      security: []
+      responses:
+        "200":
+          description: Service is live.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+  /v1/cases:
+    post:
+      tags: [Cases]
+      operationId: createCase
+      summary: Create a workflow case and optionally register initial documents.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseCreateRequest"
+            examples:
+              default:
+                value:
+                  workflow_type: kyc_onboarding
+                  priority: high
+                  customer_reference: cust_001
+                  review_required: true
+                  documents:
+                    - filename: passport.pdf
+                      mime_type: application/pdf
+                      source_channel: branch_upload
+                      retention_class: bank_ops_default
+      responses:
+        "201":
+          description: Case created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseCreateResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      tags: [Cases]
+      operationId: listCases
+      summary: List cases visible to the current user or service.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/CaseStatus"
+        - in: query
+          name: assigned_queue
+          schema:
+            type: string
+        - in: query
+          name: customer_reference
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Cases list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseListResponse"
+  /v1/cases/{caseId}:
+    get:
+      tags: [Cases]
+      operationId: getCase
+      summary: Get case metadata and current workflow state.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Case metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/status:
+    get:
+      tags: [Processing]
+      operationId: getCaseStatus
+      summary: Get lightweight case processing and review status.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Current async processing status for polling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseStatusView"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/documents:
+    post:
+      tags: [Documents]
+      operationId: addDocument
+      summary: Attach a new document to an open case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentCreate"
+      responses:
+        "201":
+          description: Document registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/documents/{documentId}:
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get one document metadata record.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: Document metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/process:
+    post:
+      tags: [Processing]
+      operationId: triggerCaseProcessing
+      summary: Explicitly trigger or resume asynchronous processing for a case.
+      description: |
+        Safe processing trigger endpoint for frontend or trusted upstream systems.
+        This does not claim immediate completion. Clients should poll `/status` and `/results`.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessingTriggerRequest"
+      responses:
+        "202":
+          description: Processing accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingAcceptedResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/results:
+    get:
+      tags: [Cases]
+      operationId: getCaseResults
+      summary: Get extracted fields, validation results, compliance summary, and route recommendation.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Extraction and validation summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseResults"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/decisions:
+    get:
+      tags: [Decisions]
+      operationId: listCaseDecisions
+      summary: List machine or human decision records for a case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Decision history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionListResponse"
+    post:
+      tags: [Decisions]
+      operationId: submitDecision
+      summary: Submit a human decision or supervisor override for a case.
+      description: |
+        This endpoint is role-gated and must respect case state transitions.
+        It is intended for authorized manual decision submission, not unsafe autonomous decisioning.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionSubmitRequest"
+            examples:
+              manualApproval:
+                value:
+                  decided_by: supervisor_001
+                  decision_type: manual_outcome
+                  route: human_review
+                  outcome: approved
+                  reason_code: all_required_checks_completed
+                  comment: Manual approval after reviewer correction and compliance confirmation.
+      responses:
+        "201":
+          description: Decision submitted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionRecord"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/decisions/latest:
+    get:
+      tags: [Decisions]
+      operationId: getLatestDecision
+      summary: Get the latest decision for a case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Latest decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/review-tasks:
+    get:
+      tags: [Review]
+      operationId: listReviewTasks
+      summary: List manual review tasks.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/ReviewTaskStatus"
+        - in: query
+          name: assigned_queue
+          schema:
+            type: string
+        - in: query
+          name: assigned_to
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Review task queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTaskListResponse"
+  /v1/review-tasks/{taskId}/claim:
+    post:
+      tags: [Review]
+      operationId: claimReviewTask
+      summary: Claim a review task and transition the case into review where valid.
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewTaskClaimRequest"
+      responses:
+        "200":
+          description: Task claimed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTaskRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/field-corrections:
+    post:
+      tags: [Review]
+      operationId: submitFieldCorrections
+      summary: Submit reviewer-confirmed corrections with evidence references.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FieldCorrectionRequest"
+      responses:
+        "200":
+          description: Corrections recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/escalations:
+    post:
+      tags: [Review]
+      operationId: escalateCase
+      summary: Escalate a case to a specialist queue.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscalationRequest"
+      responses:
+        "200":
+          description: Case escalated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseRecord"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/revalidate:
+    post:
+      tags: [Review]
+      operationId: revalidateCase
+      summary: Trigger downstream validation after correction or document update.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevalidateRequest"
+      responses:
+        "202":
+          description: Revalidation accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingAcceptedResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/close:
+    post:
+      tags: [Review]
+      operationId: closeCase
+      summary: Close a case with final outcome when policy allows.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseCaseRequest"
+      responses:
+        "200":
+          description: Case closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseRecord"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      summary: Retrieve append-only audit events for a case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Immutable audit history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventListResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/cases/{caseId}/review-actions:
+    get:
+      tags: [Audit]
+      operationId: listReviewActions
+      summary: Retrieve structured manual-review action history for a case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Review actions for the case.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewActionListResponse"
+  /internal/workflows/start:
+    post:
+      tags: [Internal]
+      operationId: startWorkflow
+      summary: Start workflow execution for a case.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowStartCommand"
+      responses:
+        "202":
+          description: Workflow accepted.
+  /internal/workflows/{caseId}:
+    get:
+      tags: [Internal]
+      operationId: getWorkflowRunStatus
+      summary: Get workflow execution state for a case.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Workflow run status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRunStatusResponse"
+  /internal/workflows/{caseId}/signal-review-complete:
+    post:
+      tags: [Internal]
+      operationId: signalReviewComplete
+      summary: Resume workflow after human review completion.
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewCompletionSignal"
+      responses:
+        "202":
+          description: Signal accepted.
+webhooks:
+  caseStatusChanged:
+    post:
+      summary: Optional downstream callback for case status changes.
+      description: |
+        Webhooks are not required for MVP. Polling via `/v1/cases/{caseId}/status`
+        and `/v1/cases/{caseId}/results` is the default client integration pattern.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseStatusChangedEvent"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OIDC/OAuth2 bearer token. Expected roles include `ops_reviewer`,
+        `compliance_analyst`, `fraud_analyst`, `supervisor`, and `platform_admin`.
+  parameters:
+    CaseId:
+      in: path
+      name: caseId
+      required: true
+      schema:
+        type: string
+    DocumentId:
+      in: path
+      name: documentId
+      required: true
+      schema:
+        type: string
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema:
+        type: string
+  responses:
+    ErrorResponse:
+      description: Standard error response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    Priority:
+      type: string
+      enum: [low, normal, high, critical]
+    CaseStatus:
+      type: string
+      enum: [received, stored, queued, processing, validated, review_required, in_review, corrected, approved, rejected, escalated, failed, closed]
+    ProcessingStatus:
+      type: string
+      enum: [not_started, in_progress, complete, failed]
+    ReviewTaskStatus:
+      type: string
+      enum: [open, claimed, completed]
+    EvidenceRef:
+      type: object
+      required: [document_id]
+      properties:
+        document_id: { type: string }
+        page_number: { type: integer }
+        text_span: { type: string }
+        bounding_box:
+          type: object
+          additionalProperties:
+            type: number
+    DocumentCreate:
+      type: object
+      required: [filename, mime_type]
+      properties:
+        filename: { type: string }
+        mime_type: { type: string }
+        source_channel: { type: string, default: manual_upload }
+        retention_class: { type: string, default: bank_ops_default }
+    DocumentRecord:
+      type: object
+      required: [document_id, case_id, filename, mime_type, source_channel, retention_class, file_hash, status, created_at]
+      properties:
+        document_id: { type: string }
+        case_id: { type: string }
+        filename: { type: string }
+        mime_type: { type: string }
+        source_channel: { type: string }
+        retention_class: { type: string }
+        file_hash: { type: string }
+        status: { $ref: "#/components/schemas/ProcessingStatus" }
+        created_at: { type: string, format: date-time }
+    CaseCreateRequest:
+      type: object
+      required: [workflow_type]
+      properties:
+        workflow_type: { type: string }
+        priority: { $ref: "#/components/schemas/Priority" }
+        customer_reference: { type: [string, "null"] }
+        review_required: { type: boolean, default: true }
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentCreate"
+    CaseRecord:
+      type: object
+      required: [case_id, workflow_type, priority, status, review_required, assigned_queue, created_at, updated_at, document_ids, review_task_ids]
+      properties:
+        case_id: { type: string }
+        workflow_type: { type: string }
+        priority: { $ref: "#/components/schemas/Priority" }
+        customer_reference: { type: [string, "null"] }
+        status: { $ref: "#/components/schemas/CaseStatus" }
+        review_required: { type: boolean }
+        assigned_queue: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        document_ids:
+          type: array
+          items: { type: string }
+        review_task_ids:
+          type: array
+          items: { type: string }
+        final_outcome: { type: [string, "null"] }
+    CaseCreateResponse:
+      type: object
+      required: [case, documents, review_tasks]
+      properties:
+        case: { $ref: "#/components/schemas/CaseRecord" }
+        documents:
+          type: array
+          items: { $ref: "#/components/schemas/DocumentRecord" }
+        review_tasks:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewTaskRecord" }
+    CaseListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CaseRecord" }
+    CaseStatusView:
+      type: object
+      required: [case_id, case_status, extraction_status, validation_status, latest_workflow_run_id, recommended_poll_after_seconds]
+      properties:
+        case_id: { type: string }
+        case_status: { $ref: "#/components/schemas/CaseStatus" }
+        extraction_status: { $ref: "#/components/schemas/ProcessingStatus" }
+        validation_status: { $ref: "#/components/schemas/ProcessingStatus" }
+        latest_workflow_run_id: { type: [string, "null"] }
+        active_step: { type: [string, "null"] }
+        pending_review_task_id: { type: [string, "null"] }
+        last_updated_at: { type: string, format: date-time }
+        recommended_poll_after_seconds: { type: integer, minimum: 1 }
+    ReviewTaskRecord:
+      type: object
+      required: [task_id, case_id, status, assigned_queue, reason_codes, created_at, updated_at]
+      properties:
+        task_id: { type: string }
+        case_id: { type: string }
+        status: { $ref: "#/components/schemas/ReviewTaskStatus" }
+        assigned_to: { type: [string, "null"] }
+        assigned_queue: { type: string }
+        reason_codes:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ReviewTaskListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewTaskRecord" }
+    ReviewTaskClaimRequest:
+      type: object
+      required: [reviewer_id]
+      properties:
+        reviewer_id: { type: string }
+    FieldResult:
+      type: object
+      required: [field_name, required, evidence_refs]
+      properties:
+        field_name: { type: string }
+        value: { type: [string, "null"] }
+        normalized_value: { type: [string, "null"] }
+        confidence: { type: [number, "null"] }
+        required: { type: boolean }
+        evidence_refs:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceRef" }
+        reason_code: { type: [string, "null"] }
+    ValidationResult:
+      type: object
+      required: [rule_id, rule_version, result, severity, reason_code, evidence_refs]
+      properties:
+        rule_id: { type: string }
+        rule_version: { type: string }
+        result: { type: string }
+        severity: { type: string }
+        reason_code: { type: string }
+        evidence_refs:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceRef" }
+    ComplianceSummary:
+      type: object
+      required: [compliance_status, requires_human_review, pending_controls]
+      properties:
+        compliance_status: { type: string }
+        requires_human_review: { type: boolean }
+        escalation_recommendation: { type: [string, "null"] }
+        pending_controls:
+          type: array
+          items: { type: string }
+    CaseResults:
+      type: object
+      required: [case_id, extraction_status, validation_status, fields, validations, recommended_route]
+      properties:
+        case_id: { type: string }
+        extraction_status: { $ref: "#/components/schemas/ProcessingStatus" }
+        validation_status: { $ref: "#/components/schemas/ProcessingStatus" }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/FieldResult" }
+        validations:
+          type: array
+          items: { $ref: "#/components/schemas/ValidationResult" }
+        compliance_summary:
+          oneOf:
+            - $ref: "#/components/schemas/ComplianceSummary"
+            - type: "null"
+        recommended_route: { type: string }
+    FieldCorrection:
+      type: object
+      required: [field_name, reason_code]
+      properties:
+        field_name: { type: string }
+        new_value: { type: [string, "null"] }
+        reason_code: { type: string }
+        evidence_refs:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceRef" }
+    FieldCorrectionRequest:
+      type: object
+      required: [reviewer_id, corrections]
+      properties:
+        reviewer_id: { type: string }
+        comment: { type: [string, "null"] }
+        corrections:
+          type: array
+          items: { $ref: "#/components/schemas/FieldCorrection" }
+    EscalationRequest:
+      type: object
+      required: [reviewer_id, escalation_target, reason_code]
+      properties:
+        reviewer_id: { type: string }
+        escalation_target: { type: string }
+        reason_code: { type: string }
+        comment: { type: [string, "null"] }
+    RevalidateRequest:
+      type: object
+      required: [requested_by, reason_code]
+      properties:
+        requested_by: { type: string }
+        reason_code: { type: string }
+    CloseCaseRequest:
+      type: object
+      required: [requested_by, outcome, reason_code]
+      properties:
+        requested_by: { type: string }
+        outcome: { type: string, enum: [approved, rejected, closed_without_decision] }
+        reason_code: { type: string }
+    DecisionRecord:
+      type: object
+      required: [decision_id, case_id, decision_type, route, status, requires_human_review, created_at]
+      properties:
+        decision_id: { type: string }
+        case_id: { type: string }
+        workflow_run_id: { type: [string, "null"] }
+        decision_type: { type: string }
+        route: { type: string }
+        outcome: { type: [string, "null"] }
+        status: { type: string, enum: [completed, blocked, needs_review, superseded] }
+        requires_human_review: { type: boolean }
+        reason_codes:
+          type: array
+          items: { type: string }
+        confidence: { type: [number, "null"] }
+        comment: { type: [string, "null"] }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    DecisionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/DecisionRecord" }
+    DecisionSubmitRequest:
+      type: object
+      required: [decided_by, decision_type, route, outcome, reason_code]
+      properties:
+        decided_by: { type: string }
+        decision_type: { type: string }
+        route: { type: string }
+        outcome: { type: string, enum: [approved, rejected, review_required, escalate] }
+        reason_code: { type: string }
+        comment: { type: [string, "null"] }
+    ReviewActionRecord:
+      type: object
+      required: [review_action_id, case_id, action_type, actor_id, reason_code, created_at]
+      properties:
+        review_action_id: { type: string }
+        case_id: { type: string }
+        review_task_id: { type: [string, "null"] }
+        action_type: { type: string }
+        actor_id: { type: string }
+        reason_code: { type: string }
+        comment: { type: [string, "null"] }
+        payload:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+    ReviewActionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewActionRecord" }
+    AuditEvent:
+      type: object
+      required: [event_id, case_id, resource_type, resource_id, action, actor_type, actor_id, occurred_at, details]
+      properties:
+        event_id: { type: string }
+        case_id: { type: string }
+        resource_type: { type: string }
+        resource_id: { type: string }
+        action: { type: string }
+        actor_type: { type: string, enum: [system, user, service] }
+        actor_id: { type: string }
+        occurred_at: { type: string, format: date-time }
+        details:
+          type: object
+          additionalProperties: true
+    AuditEventListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AuditEvent" }
+    ProcessingTriggerRequest:
+      type: object
+      required: [requested_by, reason_code]
+      properties:
+        requested_by: { type: string }
+        reason_code: { type: string }
+        force_restart: { type: boolean, default: false }
+    ProcessingAcceptedResponse:
+      type: object
+      required: [case_id, workflow_run_id, accepted_at, status_endpoint, results_endpoint]
+      properties:
+        case_id: { type: string }
+        workflow_run_id: { type: string }
+        accepted_at: { type: string, format: date-time }
+        status_endpoint: { type: string }
+        results_endpoint: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error_code, message, trace_id, retryable]
+      properties:
+        error_code: { type: string }
+        message: { type: string }
+        trace_id: { type: string }
+        retryable: { type: boolean }
+        details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+    VersionRefs:
+      type: object
+      required: [schema_version]
+      properties:
+        workflow_definition_version: { type: [string, "null"] }
+        schema_version: { type: string }
+        rule_pack_version: { type: [string, "null"] }
+        prompt_version: { type: [string, "null"] }
+    WorkflowStartCommand:
+      type: object
+      required: [trace_id, case_id, workflow_type, initiated_by, version_refs]
+      properties:
+        trace_id: { type: string }
+        case_id: { type: string }
+        workflow_type: { type: string }
+        document_ids:
+          type: array
+          items: { type: string }
+        initiated_by: { type: string }
+        version_refs: { $ref: "#/components/schemas/VersionRefs" }
+    ReviewCompletionSignal:
+      type: object
+      required: [trace_id, case_id, review_task_id, triggered_by, outcome]
+      properties:
+        trace_id: { type: string }
+        case_id: { type: string }
+        review_task_id: { type: string }
+        triggered_by: { type: string }
+        outcome: { type: string }
+        reason_codes:
+          type: array
+          items: { type: string }
+    WorkflowRunStatusResponse:
+      type: object
+      required: [workflow_run_id, case_id, status, started_at_utc, updated_at_utc, retryable_failure_count]
+      properties:
+        workflow_run_id: { type: string }
+        case_id: { type: string }
+        status: { type: string }
+        active_step: { type: [string, "null"] }
+        pending_review_task_id: { type: [string, "null"] }
+        started_at_utc: { type: string, format: date-time }
+        updated_at_utc: { type: string, format: date-time }
+        retryable_failure_count: { type: integer }
+        latest_error_code: { type: [string, "null"] }
+    CaseStatusChangedEvent:
+      type: object
+      required: [case_id, previous_status, new_status, trace_id, occurred_at]
+      properties:
+        case_id: { type: string }
+        previous_status: { type: [string, "null"] }
+        new_status: { $ref: "#/components/schemas/CaseStatus" }
+        trace_id: { type: string }
+        occurred_at: { type: string, format: date-time }

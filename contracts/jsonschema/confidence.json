@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/confidence.json",
+  "title": "Confidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["score", "label"],
+  "properties": {
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "label": {
+      "type": "string",
+      "enum": ["high_confidence", "medium_confidence", "low_confidence", "not_confident"]
+    },
+    "method": {
+      "type": ["string", "null"]
+    },
+    "contributors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  }
+}

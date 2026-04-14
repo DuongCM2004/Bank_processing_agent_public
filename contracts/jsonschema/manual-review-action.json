@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/manual-review-action.json",
+  "title": "ManualReviewAction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_action_id", "case_id", "action_type", "actor_id", "reason_code", "created_at_utc"],
+  "properties": {
+    "review_action_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "review_task_id": { "type": ["string", "null"] },
+    "action_type": {
+      "type": "string",
+      "enum": ["claim", "correct_field", "escalate", "revalidate", "close", "comment"]
+    },
+    "actor_id": { "type": "string" },
+    "reason_code": { "type": "string" },
+    "comment": { "type": ["string", "null"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "$ref": "evidence-ref.json" }
+    },
+    "trace_id": { "type": ["string", "null"] },
+    "created_at_utc": { "type": "string", "format": "date-time" }
+  }
+}

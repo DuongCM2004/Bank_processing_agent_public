@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/audit-event.json",
+  "title": "AuditEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "trace_id", "case_id", "resource_type", "resource_id", "action", "actor_type", "actor_id", "occurred_at_utc"],
+  "properties": {
+    "event_id": { "type": "string" },
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "resource_type": { "type": "string" },
+    "resource_id": { "type": "string" },
+    "action": { "type": "string" },
+    "actor_type": { "type": "string", "enum": ["system", "user", "service"] },
+    "actor_id": { "type": "string" },
+    "occurred_at_utc": { "type": "string", "format": "date-time" },
+    "details": { "type": "object", "additionalProperties": true },
+    "immutable_hash": { "type": ["string", "null"] },
+    "version_refs": {
+      "oneOf": [
+        { "$ref": "version-refs.json" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

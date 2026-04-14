@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/extraction-output.json",
+  "title": "ExtractionOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "document_id", "extraction_run_id", "document_type", "schema_name", "status", "confidence", "fields", "missing_fields", "conflicts", "reason_codes", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "document_id": { "type": "string" },
+    "document_version_id": { "type": ["string", "null"] },
+    "extraction_run_id": { "type": "string" },
+    "document_type": { "type": "string" },
+    "schema_name": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "needs_review", "insufficient_evidence", "error"] },
+    "confidence": { "$ref": "confidence.json" },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field_name", "required", "status"],
+        "properties": {
+          "field_name": { "type": "string" },
+          "value": { "type": ["string", "null"] },
+          "normalized_value": { "type": ["string", "null"] },
+          "value_type": { "type": ["string", "null"] },
+          "required": { "type": "boolean" },
+          "status": { "type": "string" },
+          "confidence": {
+            "oneOf": [
+              { "$ref": "confidence.json" },
+              { "type": "null" }
+            ]
+          },
+          "method": { "type": ["string", "null"] },
+          "reason_code": { "type": ["string", "null"] },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "$ref": "evidence-ref.json" }
+          }
+        }
+      }
+    },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field_name", "candidate_values", "reason_code"],
+        "properties": {
+          "field_name": { "type": "string" },
+          "candidate_values": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "reason_code": { "type": "string" }
+        }
+      }
+    },
+    "reason_codes": { "type": "array", "items": { "type": "string" } },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

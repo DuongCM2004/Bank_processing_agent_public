@@ -1,0 +1,322 @@
+openapi: 3.1.0
+info:
+  title: Ops Agent API Contract Pack
+  version: 1.2.0-draft
+  summary: Strongly structured API contract pack for typed frontend and SDK generation.
+  description: |
+    Contract-first draft for the banking Document Processing Agent.
+    Mutating endpoints are expected to enforce explicit state guards and return typed conflicts.
+  x-codegen-notes:
+    - Keep operationId values stable after SDK generation starts.
+    - Generate clients from this file, not by scraping route code.
+    - Preserve enums as strings and respect additionalProperties false.
+servers:
+  - { url: https://api.ops-agent.bank.local, description: Production }
+  - { url: https://staging-api.ops-agent.bank.local, description: Staging }
+  - { url: http://localhost:8000, description: Local }
+tags:
+  - { name: System, description: Health and runtime metadata }
+  - { name: Cases, description: Case lifecycle and retrieval }
+  - { name: Documents, description: Document registration and lookup }
+  - { name: Processing, description: Async processing control and polling }
+  - { name: Decisions, description: Manual and machine-assisted decisions }
+  - { name: Review, description: Review queue and reviewer actions }
+  - { name: Audit, description: Audit and review history }
+  - { name: Internal, description: Trusted workflow orchestration endpoints }
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: healthCheck
+      security: []
+      responses: { "200": { $ref: "#/components/responses/HealthOk" } }
+  /v1/cases:
+    get:
+      tags: [Cases]
+      operationId: listCases
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - { in: query, name: status, schema: { $ref: "#/components/schemas/CaseStatus" } }
+        - { in: query, name: assigned_queue, schema: { type: string } }
+        - { in: query, name: customer_reference, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { $ref: "#/components/responses/CaseListOk" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+    post:
+      tags: [Cases]
+      operationId: createCase
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CaseCreateRequest" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/CaseCreateOk" }
+        "400": { $ref: "#/components/responses/BadRequestError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/cases/{caseId}:
+    get:
+      tags: [Cases]
+      operationId: getCase
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses:
+        "200": { $ref: "#/components/responses/CaseOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+  /v1/cases/{caseId}/status:
+    get:
+      tags: [Processing]
+      operationId: getCaseStatus
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses:
+        "200": { $ref: "#/components/responses/CaseStatusOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+  /v1/cases/{caseId}/documents:
+    post:
+      tags: [Documents]
+      operationId: addDocument
+      x-ops-agent-state-guards: { allowed_case_statuses: [received, stored, queued, processing, review_required, in_review, corrected], conflict_error_code: state_transition_conflict }
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - $ref: "#/components/parameters/CaseId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DocumentCreate" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/DocumentOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+  /v1/cases/{caseId}/documents/{documentId}:
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }, { $ref: "#/components/parameters/DocumentId" }]
+      responses:
+        "200": { $ref: "#/components/responses/DocumentOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+  /v1/cases/{caseId}/process:
+    post:
+      tags: [Processing]
+      operationId: triggerCaseProcessing
+      x-ops-agent-state-guards: { allowed_case_statuses: [received, stored, queued, review_required, corrected, failed], conflict_error_code: state_transition_conflict, idempotent: true }
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - $ref: "#/components/parameters/CaseId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProcessingTriggerRequest" } } } }
+      responses:
+        "202": { $ref: "#/components/responses/ProcessingAccepted" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/cases/{caseId}/results:
+    get:
+      tags: [Cases]
+      operationId: getCaseResults
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses:
+        "200": { $ref: "#/components/responses/CaseResultsOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+  /v1/cases/{caseId}/decisions:
+    get:
+      tags: [Decisions]
+      operationId: listCaseDecisions
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses: { "200": { $ref: "#/components/responses/DecisionListOk" } }
+    post:
+      tags: [Decisions]
+      operationId: submitDecision
+      x-ops-agent-state-guards: { allowed_case_statuses: [review_required, in_review, corrected, validated, escalated], conflict_error_code: state_transition_conflict, required_roles: [supervisor, compliance_analyst] }
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - $ref: "#/components/parameters/CaseId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DecisionSubmitRequest" } } } }
+      responses:
+        "201": { $ref: "#/components/responses/DecisionOk" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/cases/{caseId}/decisions/latest:
+    get:
+      tags: [Decisions]
+      operationId: getLatestDecision
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses:
+        "200": { $ref: "#/components/responses/DecisionOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+  /v1/review-tasks:
+    get:
+      tags: [Review]
+      operationId: listReviewTasks
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - { in: query, name: status, schema: { $ref: "#/components/schemas/ReviewTaskStatus" } }
+        - { in: query, name: assigned_queue, schema: { type: string } }
+        - { in: query, name: assigned_to, schema: { type: string } }
+      responses: { "200": { $ref: "#/components/responses/ReviewTaskListOk" } }
+  /v1/review-tasks/{taskId}/claim:
+    post:
+      tags: [Review]
+      operationId: claimReviewTask
+      x-ops-agent-state-guards: { allowed_task_statuses: [open], allowed_case_statuses: [review_required, escalated], conflict_error_code: state_transition_conflict }
+      parameters:
+        - $ref: "#/components/parameters/TraceIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - $ref: "#/components/parameters/TaskId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewTaskClaimRequest" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/ReviewTaskOk" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+  /v1/cases/{caseId}/field-corrections:
+    post:
+      tags: [Review]
+      operationId: submitFieldCorrections
+      x-ops-agent-state-guards: { allowed_case_statuses: [in_review, corrected, review_required], conflict_error_code: state_transition_conflict }
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/FieldCorrectionRequest" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/CaseOk" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/cases/{caseId}/escalations:
+    post:
+      tags: [Review]
+      operationId: escalateCase
+      x-ops-agent-state-guards: { allowed_case_statuses: [review_required, in_review, corrected], conflict_error_code: state_transition_conflict }
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EscalationRequest" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/CaseOk" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+  /v1/cases/{caseId}/revalidate:
+    post:
+      tags: [Review]
+      operationId: revalidateCase
+      x-ops-agent-state-guards: { allowed_case_statuses: [corrected, in_review, review_required, escalated], conflict_error_code: state_transition_conflict, idempotent: true }
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RevalidateRequest" } } } }
+      responses:
+        "202": { $ref: "#/components/responses/ProcessingAccepted" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+  /v1/cases/{caseId}/close:
+    post:
+      tags: [Review]
+      operationId: closeCase
+      x-ops-agent-state-guards: { allowed_case_statuses: [approved, rejected, escalated, review_required, corrected, validated], conflict_error_code: state_transition_conflict }
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CloseCaseRequest" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/CaseOk" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /v1/cases/{caseId}/audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses: { "200": { $ref: "#/components/responses/AuditEventListOk" } }
+  /v1/cases/{caseId}/review-actions:
+    get:
+      tags: [Audit]
+      operationId: listReviewActions
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses: { "200": { $ref: "#/components/responses/ReviewActionListOk" } }
+  /internal/workflows/start:
+    post:
+      tags: [Internal]
+      operationId: startWorkflow
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/WorkflowStartCommand" } } } }
+      responses: { "202": { $ref: "#/components/responses/WorkflowAccepted" } }
+  /internal/workflows/{caseId}:
+    get:
+      tags: [Internal]
+      operationId: getWorkflowRunStatus
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      responses: { "200": { $ref: "#/components/responses/WorkflowRunStatusOk" } }
+  /internal/workflows/{caseId}/signal-review-complete:
+    post:
+      tags: [Internal]
+      operationId: signalReviewComplete
+      parameters: [{ $ref: "#/components/parameters/TraceIdHeader" }, { $ref: "#/components/parameters/IdempotencyKeyHeader" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewCompletionSignal" } } } }
+      responses: { "202": { $ref: "#/components/responses/WorkflowAccepted" } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    TraceIdHeader: { in: header, name: X-Trace-Id, required: false, schema: { type: string } }
+    IdempotencyKeyHeader: { in: header, name: Idempotency-Key, required: false, schema: { type: string, minLength: 8, maxLength: 128 } }
+    CaseId: { in: path, name: caseId, required: true, schema: { type: string, pattern: "^case_[A-Za-z0-9_]+$" } }
+    DocumentId: { in: path, name: documentId, required: true, schema: { type: string, pattern: "^doc_[A-Za-z0-9_]+$" } }
+    TaskId: { in: path, name: taskId, required: true, schema: { type: string, pattern: "^review_task_[A-Za-z0-9_]+$" } }
+  responses:
+    HealthOk: { description: Service is live, content: { application/json: { schema: { $ref: "#/components/schemas/HealthResponse" } } } }
+    CaseOk: { description: Case metadata, content: { application/json: { schema: { $ref: "#/components/schemas/CaseRecord" } } } }
+    CaseCreateOk: { description: Case created, content: { application/json: { schema: { $ref: "#/components/schemas/CaseCreateResponse" } } } }
+    CaseListOk: { description: Case list, content: { application/json: { schema: { $ref: "#/components/schemas/CaseListResponse" } } } }
+    CaseStatusOk: { description: Lightweight case status, content: { application/json: { schema: { $ref: "#/components/schemas/CaseStatusView" } } } }
+    DocumentOk: { description: Document metadata, content: { application/json: { schema: { $ref: "#/components/schemas/DocumentRecord" } } } }
+    CaseResultsOk: { description: Case results, content: { application/json: { schema: { $ref: "#/components/schemas/CaseResults" } } } }
+    ReviewTaskOk: { description: Review task, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewTaskRecord" } } } }
+    ReviewTaskListOk: { description: Review tasks, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewTaskListResponse" } } } }
+    DecisionOk: { description: Decision record, content: { application/json: { schema: { $ref: "#/components/schemas/DecisionRecord" } } } }
+    DecisionListOk: { description: Decision history, content: { application/json: { schema: { $ref: "#/components/schemas/DecisionListResponse" } } } }
+    ProcessingAccepted: { description: Async processing accepted, content: { application/json: { schema: { $ref: "#/components/schemas/ProcessingAcceptedResponse" } } } }
+    AuditEventListOk: { description: Audit history, content: { application/json: { schema: { $ref: "#/components/schemas/AuditEventListResponse" } } } }
+    ReviewActionListOk: { description: Review action history, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewActionListResponse" } } } }
+    WorkflowAccepted: { description: Workflow command accepted, content: { application/json: { schema: { $ref: "#/components/schemas/WorkflowAcceptedResponse" } } } }
+    WorkflowRunStatusOk: { description: Workflow status, content: { application/json: { schema: { $ref: "#/components/schemas/WorkflowRunStatusResponse" } } } }
+    BadRequestError: { description: Bad request, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+    UnauthorizedError: { description: Authentication required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+    ForbiddenError: { description: Caller lacks permission, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+    NotFoundError: { description: Resource not found, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+    ConflictError: { description: Request conflicts with current state, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+    ValidationError: { description: Business validation failed, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorObject" } } } }
+  schemas:
+    HealthResponse: { type: object, additionalProperties: false, required: [status], properties: { status: { type: string, const: ok } } }
+    Priority: { type: string, enum: [low, normal, high, critical] }
+    CaseStatus: { type: string, enum: [received, stored, queued, processing, validated, review_required, in_review, corrected, approved, rejected, escalated, failed, closed] }
+    ProcessingStatus: { type: string, enum: [not_started, in_progress, complete, failed] }
+    WorkflowRunStatus: { type: string, enum: [queued, in_progress, waiting_review, completed, failed] }
+    ReviewTaskStatus: { type: string, enum: [open, claimed, completed] }
+    ReviewActionType: { type: string, enum: [claim, correct_field, escalate, revalidate, close] }
+    EvidenceRef: { type: object, additionalProperties: false, required: [document_id], properties: { document_id: { type: string }, page_number: { type: [integer, "null"], minimum: 1 }, text_span: { type: [string, "null"] }, bounding_box: { oneOf: [ { type: object, additionalProperties: { type: number } }, { type: "null" } ] } } }
+    DocumentCreate: { type: object, additionalProperties: false, required: [filename, mime_type], properties: { filename: { type: string }, mime_type: { type: string }, source_channel: { type: string, default: manual_upload }, retention_class: { type: string, default: bank_ops_default } } }
+    DocumentRecord: { type: object, additionalProperties: false, required: [document_id, case_id, filename, mime_type, source_channel, retention_class, file_hash, status, created_at], properties: { document_id: { type: string }, case_id: { type: string }, filename: { type: string }, mime_type: { type: string }, source_channel: { type: string }, retention_class: { type: string }, file_hash: { type: string }, status: { $ref: "#/components/schemas/ProcessingStatus" }, created_at: { type: string, format: date-time } } }
+    ReviewTaskRecord: { type: object, additionalProperties: false, required: [task_id, case_id, status, assigned_queue, reason_codes, created_at, updated_at], properties: { task_id: { type: string }, case_id: { type: string }, status: { $ref: "#/components/schemas/ReviewTaskStatus" }, assigned_to: { type: [string, "null"] }, assigned_queue: { type: string }, reason_codes: { type: array, items: { type: string } }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time } } }
+    CaseRecord: { type: object, additionalProperties: false, required: [case_id, workflow_type, priority, status, review_required, assigned_queue, created_at, updated_at, document_ids, review_task_ids], properties: { case_id: { type: string }, workflow_type: { type: string }, priority: { $ref: "#/components/schemas/Priority" }, customer_reference: { type: [string, "null"] }, status: { $ref: "#/components/schemas/CaseStatus" }, review_required: { type: boolean }, assigned_queue: { type: string }, created_at: { type: string, format: date-time }, updated_at: { type: string, format: date-time }, document_ids: { type: array, items: { type: string } }, review_task_ids: { type: array, items: { type: string } }, final_outcome: { type: [string, "null"] } } }
+    CaseCreateRequest: { type: object, additionalProperties: false, required: [workflow_type], properties: { workflow_type: { type: string }, priority: { $ref: "#/components/schemas/Priority", default: normal }, customer_reference: { type: [string, "null"] }, review_required: { type: boolean, default: true }, documents: { type: array, items: { $ref: "#/components/schemas/DocumentCreate" } } } }
+    CaseCreateResponse: { type: object, additionalProperties: false, required: [case, documents, review_tasks], properties: { case: { $ref: "#/components/schemas/CaseRecord" }, documents: { type: array, items: { $ref: "#/components/schemas/DocumentRecord" } }, review_tasks: { type: array, items: { $ref: "#/components/schemas/ReviewTaskRecord" } } } }
+    CaseListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/CaseRecord" } } } }
+    FieldResult: { type: object, additionalProperties: false, required: [field_name, required, evidence_refs], properties: { field_name: { type: string }, value: { type: [string, "null"] }, normalized_value: { type: [string, "null"] }, confidence: { type: [number, "null"], minimum: 0, maximum: 1 }, required: { type: boolean }, evidence_refs: { type: array, items: { $ref: "#/components/schemas/EvidenceRef" } }, reason_code: { type: [string, "null"] } } }
+    ValidationResult: { type: object, additionalProperties: false, required: [rule_id, rule_version, result, severity, reason_code, evidence_refs], properties: { rule_id: { type: string }, rule_version: { type: string }, result: { type: string }, severity: { type: string }, reason_code: { type: string }, evidence_refs: { type: array, items: { $ref: "#/components/schemas/EvidenceRef" } } } }
+    CaseResults: { type: object, additionalProperties: false, required: [case_id, extraction_status, validation_status, fields, validations, recommended_route], properties: { case_id: { type: string }, extraction_status: { $ref: "#/components/schemas/ProcessingStatus" }, validation_status: { $ref: "#/components/schemas/ProcessingStatus" }, fields: { type: array, items: { $ref: "#/components/schemas/FieldResult" } }, validations: { type: array, items: { $ref: "#/components/schemas/ValidationResult" } }, recommended_route: { type: string } } }
+    DecisionRecord: { type: object, additionalProperties: false, required: [decision_id, case_id, decision_type, outcome, actor_id, actor_type, reason_code, evidence_refs, created_at], properties: { decision_id: { type: string }, case_id: { type: string }, workflow_run_id: { type: [string, "null"] }, decision_type: { type: string }, outcome: { type: string }, actor_id: { type: string }, actor_type: { type: string }, reason_code: { type: string }, confidence: { type: [number, "null"], minimum: 0, maximum: 1 }, evidence_refs: { type: array, items: { $ref: "#/components/schemas/EvidenceRef" } }, created_at: { type: string, format: date-time } } }
+    DecisionListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/DecisionRecord" } } } }
+    ProcessingTriggerRequest: { type: object, additionalProperties: false, required: [requested_by, reason_code], properties: { requested_by: { type: string }, reason_code: { type: string, default: manual_processing_trigger } } }
+    ProcessingAcceptedResponse: { type: object, additionalProperties: false, required: [case_id, workflow_run_id, workflow_status, case_status, accepted_at], properties: { case_id: { type: string }, workflow_run_id: { type: string }, workflow_status: { $ref: "#/components/schemas/WorkflowRunStatus" }, case_status: { $ref: "#/components/schemas/CaseStatus" }, accepted_at: { type: string, format: date-time } } }
+    CaseStatusView: { type: object, additionalProperties: false, required: [case_id, case_status, extraction_status, validation_status, updated_at], properties: { case_id: { type: string }, case_status: { $ref: "#/components/schemas/CaseStatus" }, extraction_status: { $ref: "#/components/schemas/ProcessingStatus" }, validation_status: { $ref: "#/components/schemas/ProcessingStatus" }, workflow_run_id: { type: [string, "null"] }, workflow_status: { oneOf: [ { $ref: "#/components/schemas/WorkflowRunStatus" }, { type: "null" } ] }, active_step: { type: [string, "null"] }, pending_review_task_id: { type: [string, "null"] }, latest_decision_outcome: { type: [string, "null"] }, updated_at: { type: string, format: date-time } } }
+    ReviewTaskListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/ReviewTaskRecord" } } } }
+    ReviewTaskClaimRequest: { type: object, additionalProperties: false, required: [reviewer_id], properties: { reviewer_id: { type: string } } }
+    FieldCorrection: { type: object, additionalProperties: false, required: [field_name, reason_code, evidence_refs], properties: { field_name: { type: string }, new_value: { type: [string, "null"] }, reason_code: { type: string }, evidence_refs: { type: array, items: { $ref: "#/components/schemas/EvidenceRef" } } } }
+    FieldCorrectionRequest: { type: object, additionalProperties: false, required: [reviewer_id, corrections], properties: { reviewer_id: { type: string }, comment: { type: [string, "null"] }, corrections: { type: array, minItems: 1, items: { $ref: "#/components/schemas/FieldCorrection" } } } }
+    EscalationRequest: { type: object, additionalProperties: false, required: [reviewer_id, escalation_target, reason_code], properties: { reviewer_id: { type: string }, escalation_target: { type: string }, reason_code: { type: string }, comment: { type: [string, "null"] } } }
+    RevalidateRequest: { type: object, additionalProperties: false, required: [requested_by, reason_code], properties: { requested_by: { type: string }, reason_code: { type: string } } }
+    CloseCaseRequest: { type: object, additionalProperties: false, required: [requested_by, outcome, reason_code], properties: { requested_by: { type: string }, outcome: { type: string, enum: [approved, rejected, closed_without_decision] }, reason_code: { type: string } } }
+    DecisionSubmitRequest: { type: object, additionalProperties: false, required: [decided_by, decision_type, outcome, reason_code], properties: { decided_by: { type: string }, decision_type: { type: string }, outcome: { type: string, enum: [approved, rejected, review_required, escalate] }, reason_code: { type: string }, comment: { type: [string, "null"] } } }
+    ReviewActionRecord: { type: object, additionalProperties: false, required: [action_id, case_id, action_type, actor_id, reason_code, payload, created_at], properties: { action_id: { type: string }, case_id: { type: string }, task_id: { type: [string, "null"] }, action_type: { $ref: "#/components/schemas/ReviewActionType" }, actor_id: { type: string }, reason_code: { type: string }, comment: { type: [string, "null"] }, payload: { type: object, additionalProperties: true }, created_at: { type: string, format: date-time } } }
+    ReviewActionListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/ReviewActionRecord" } } } }
+    AuditEvent: { type: object, additionalProperties: false, required: [event_id, case_id, resource_type, resource_id, action, actor_type, actor_id, occurred_at, details], properties: { event_id: { type: string }, case_id: { type: string }, resource_type: { type: string }, resource_id: { type: string }, action: { type: string }, actor_type: { type: string, enum: [system, user] }, actor_id: { type: string }, occurred_at: { type: string, format: date-time }, details: { type: object, additionalProperties: true } } }
+    AuditEventListResponse: { type: object, additionalProperties: false, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } } } }
+    FieldError: { type: object, additionalProperties: false, required: [field, message], properties: { field: { type: string }, message: { type: string }, code: { type: [string, "null"] } } }
+    StateConflictDetails: { type: object, additionalProperties: false, required: [requested_operation, current_state], properties: { requested_operation: { type: string }, current_state: { type: string }, allowed_states: { type: array, items: { type: string } }, resource_type: { type: [string, "null"] }, resource_id: { type: [string, "null"] } } }
+    ValidationFailureDetails: { type: object, additionalProperties: false, required: [field_errors], properties: { field_errors: { type: array, items: { $ref: "#/components/schemas/FieldError" } } } }
+    ErrorObject: { type: object, additionalProperties: false, required: [error_code, message, trace_id, retryable], properties: { error_code: { type: string }, message: { type: string }, trace_id: { type: string }, retryable: { type: boolean }, status_code: { type: [integer, "null"] }, failing_step: { type: [string, "null"] }, details: { oneOf: [ { $ref: "#/components/schemas/StateConflictDetails" }, { $ref: "#/components/schemas/ValidationFailureDetails" }, { type: object, additionalProperties: true }, { type: "null" } ] }, artifact_refs: { type: array, items: { type: string } } } }
+    VersionRefs: { type: object, additionalProperties: false, required: [schema_version], properties: { workflow_definition_version: { type: [string, "null"] }, schema_version: { type: string }, rule_pack_version: { type: [string, "null"] }, prompt_version: { type: [string, "null"] } } }
+    WorkflowStartCommand: { type: object, additionalProperties: false, required: [trace_id, case_id, workflow_type, initiated_by, version_refs], properties: { trace_id: { type: string }, case_id: { type: string }, workflow_type: { type: string }, document_ids: { type: array, items: { type: string } }, initiated_by: { type: string }, version_refs: { $ref: "#/components/schemas/VersionRefs" } } }
+    ReviewCompletionSignal: { type: object, additionalProperties: false, required: [trace_id, case_id, review_task_id, triggered_by, outcome], properties: { trace_id: { type: string }, case_id: { type: string }, review_task_id: { type: string }, triggered_by: { type: string }, outcome: { type: string }, reason_codes: { type: array, items: { type: string } } } }
+    WorkflowAcceptedResponse: { type: object, additionalProperties: false, required: [accepted, trace_id], properties: { accepted: { type: boolean, const: true }, trace_id: { type: string } } }
+    WorkflowRunStatusResponse: { type: object, additionalProperties: false, required: [workflow_run_id, case_id, status, started_at_utc, updated_at_utc, retryable_failure_count], properties: { workflow_run_id: { type: string }, case_id: { type: string }, status: { $ref: "#/components/schemas/WorkflowRunStatus" }, active_step: { type: [string, "null"] }, pending_review_task_id: { type: [string, "null"] }, started_at_utc: { type: string, format: date-time }, updated_at_utc: { type: string, format: date-time }, retryable_failure_count: { type: integer, minimum: 0 }, latest_error_code: { type: [string, "null"] } } }

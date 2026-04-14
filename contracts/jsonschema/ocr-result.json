@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/ocr-result.json",
+  "title": "OCRResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "document_id", "ocr_result_id", "status", "confidence", "artifact_id", "page_count", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "document_id": { "type": "string" },
+    "document_version_id": { "type": ["string", "null"] },
+    "ocr_result_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "failed", "needs_review", "insufficient_evidence"] },
+    "confidence": { "$ref": "confidence.json" },
+    "artifact_id": { "type": "string" },
+    "page_count": { "type": "integer", "minimum": 0 },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["page_number", "page_confidence", "coverage_ratio", "image_quality_score"],
+        "properties": {
+          "page_number": { "type": "integer", "minimum": 1 },
+          "page_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "coverage_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+          "image_quality_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "text_blocks_ref": { "type": ["string", "null"] },
+          "preview_object_key": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

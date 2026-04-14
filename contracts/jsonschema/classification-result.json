@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/classification-result.json",
+  "title": "ClassificationResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "document_id", "classification_result_id", "document_type", "confidence", "candidate_types", "status", "reason_codes", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "document_id": { "type": "string" },
+    "document_version_id": { "type": ["string", "null"] },
+    "classification_result_id": { "type": "string" },
+    "document_type": { "type": "string" },
+    "subtype": { "type": ["string", "null"] },
+    "confidence": { "$ref": "confidence.json" },
+    "candidate_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "score"],
+        "properties": {
+          "label": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "status": { "type": "string", "enum": ["completed", "failed", "needs_review", "insufficient_evidence"] },
+    "reason_codes": { "type": "array", "items": { "type": "string" } },
+    "requires_human_review": { "type": "boolean" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "$ref": "evidence-ref.json" }
+    },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

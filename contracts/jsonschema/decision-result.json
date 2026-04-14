@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/decision-result.json",
+  "title": "DecisionResult",
+  "type": "object",
+  "allOf": [
+    { "$ref": "decision-output.json" }
+  ]
+}

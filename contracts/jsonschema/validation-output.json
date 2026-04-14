@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/validation-output.json",
+  "title": "ValidationOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "case_id", "validation_run_id", "status", "results", "confidence", "version_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "document_id": { "type": ["string", "null"] },
+    "document_version_id": { "type": ["string", "null"] },
+    "validation_run_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "failed", "needs_review"] },
+    "confidence": { "$ref": "confidence.json" },
+    "blocking_issue_count": { "type": ["integer", "null"] },
+    "warning_count": { "type": ["integer", "null"] },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "rule_version", "result", "severity", "reason_code"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "rule_version": { "type": "string" },
+          "result": { "type": "string" },
+          "severity": { "type": "string" },
+          "reason_code": { "type": "string" },
+          "impacted_field_name": { "type": ["string", "null"] },
+          "details": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": true },
+              { "type": "null" }
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "$ref": "evidence-ref.json" }
+          }
+        }
+      }
+    },
+    "version_refs": { "$ref": "version-refs.json" }
+  }
+}

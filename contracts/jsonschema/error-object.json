@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops-agent.bank.local/schemas/error-object.json",
+  "title": "ErrorObject",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error_code", "message", "trace_id", "retryable"],
+  "properties": {
+    "error_code": { "type": "string" },
+    "message": { "type": "string" },
+    "trace_id": { "type": "string" },
+    "retryable": { "type": "boolean" },
+    "status_code": { "type": ["integer", "null"] },
+    "failing_step": { "type": ["string", "null"] },
+    "details": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": true },
+        { "type": "null" }
+      ]
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
