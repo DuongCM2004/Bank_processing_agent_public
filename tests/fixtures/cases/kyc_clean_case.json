@@ -1,0 +1,15 @@
+{
+  "scenario_id": "kyc_clean_case",
+  "description": "Single clean KYC onboarding document set with expected manual review path available.",
+  "workflow_type": "kyc_onboarding",
+  "priority": "normal",
+  "review_required": true,
+  "documents": [
+    {
+      "filename": "passport.pdf",
+      "mime_type": "application/pdf",
+      "source_channel": "ops_upload",
+      "retention_class": "bank_ops_default"
+    }
+  ]
+}

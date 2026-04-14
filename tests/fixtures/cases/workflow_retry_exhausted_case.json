@@ -1,0 +1,19 @@
+{
+  "scenario_id": "workflow_retry_exhausted_case",
+  "description": "Document flow used to verify retry exhaustion and explicit failure or supervisor routing.",
+  "workflow_type": "income_verification",
+  "priority": "critical",
+  "review_required": true,
+  "documents": [
+    {
+      "filename": "damaged_statement.pdf",
+      "mime_type": "application/pdf",
+      "source_channel": "ops_upload",
+      "retention_class": "bank_ops_default"
+    }
+  ],
+  "expected_terminal_states": [
+    "review_required",
+    "failed"
+  ]
+}
