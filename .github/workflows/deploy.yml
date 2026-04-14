@@ -1,0 +1,106 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      deploy_scope:
+        description: Deployment scope
+        required: true
+        type: choice
+        options:
+          - application
+          - full_stack
+      run_migrations:
+        description: Run database migrations
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install backend dependencies
+        run: python -m pip install -e .[dev]
+
+      - name: Run backend tests
+        run: pytest
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Run frontend lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+  deploy-database:
+    needs: release-gate
+    if: ${{ inputs.run_migrations }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Migration plan
+        run: |
+          echo "Apply migrations in db/migrations for environment ${{ inputs.target_environment }}"
+          echo "Use bank-approved migration runner here before application rollout."
+
+  deploy-backend-worker:
+    needs:
+      - release-gate
+      - deploy-database
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Backend rollout plan
+        run: |
+          echo "Deploy backend API image"
+          echo "Deploy workflow worker image"
+          echo "Promote only after health and auth checks succeed"
+
+  deploy-frontend:
+    needs: deploy-backend-worker
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Frontend rollout plan
+        run: |
+          echo "Deploy frontend after backend and worker are healthy"
+          echo "Pin frontend to environment-specific API base URL"
