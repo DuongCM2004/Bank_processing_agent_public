@@ -11,7 +11,10 @@ from ops_agent.infrastructure.db.models.base import BaseModel, future_info, mvp_
 
 class Decision(BaseModel):
     __tablename__ = "decisions"
-    __table_args__ = (Index("ix_decisions_case_id", "case_id"),)
+    __table_args__ = (
+        Index("ix_decisions_case_id", "case_id"),
+        Index("ix_decisions_outcome", "outcome"),
+    )
 
     case_id: Mapped[UUID] = mapped_column(
         ForeignKey("cases.id", ondelete="CASCADE"),
@@ -73,7 +76,10 @@ class Decision(BaseModel):
 
 class ManualReviewAction(BaseModel):
     __tablename__ = "manual_review_actions"
-    __table_args__ = (Index("ix_manual_review_actions_case_id", "case_id"),)
+    __table_args__ = (
+        Index("ix_manual_review_actions_case_id", "case_id"),
+        Index("ix_manual_review_actions_case_id_created_at", "case_id", "created_at"),
+    )
 
     case_id: Mapped[UUID] = mapped_column(
         ForeignKey("cases.id", ondelete="CASCADE"),

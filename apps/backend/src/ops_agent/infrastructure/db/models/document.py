@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, JSON, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ops_agent.domain.shared.enums import DocumentStatus, ProcessingStatus
@@ -12,7 +12,11 @@ from ops_agent.infrastructure.db.models.base import BaseModel, future_info, mvp_
 
 class Document(BaseModel):
     __tablename__ = "documents"
-    __table_args__ = (Index("ix_documents_case_id_status", "case_id", "status"),)
+    __table_args__ = (
+        UniqueConstraint("storage_key", name="uq_documents_storage_key"),
+        Index("ix_documents_case_id_status", "case_id", "status"),
+        Index("ix_documents_sha256_digest", "sha256_digest"),
+    )
 
     case_id: Mapped[UUID] = mapped_column(
         ForeignKey("cases.id", ondelete="CASCADE"),
@@ -156,7 +160,10 @@ class OCRResult(BaseModel):
 
 class ExtractionResult(BaseModel):
     __tablename__ = "extraction_results"
-    __table_args__ = (Index("ix_extraction_results_document_status", "document_id", "status"),)
+    __table_args__ = (
+        Index("ix_extraction_results_document_status", "document_id", "status"),
+        Index("ix_extraction_results_schema_name", "schema_name"),
+    )
 
     document_id: Mapped[UUID] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"),

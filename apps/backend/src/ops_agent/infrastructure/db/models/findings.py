@@ -11,7 +11,10 @@ from ops_agent.infrastructure.db.models.base import BaseModel, future_info, mvp_
 
 class ValidationFinding(BaseModel):
     __tablename__ = "validation_findings"
-    __table_args__ = (Index("ix_validation_findings_case_status", "case_id", "status"),)
+    __table_args__ = (
+        Index("ix_validation_findings_case_status", "case_id", "status"),
+        Index("ix_validation_findings_extraction_result_id", "extraction_result_id"),
+    )
 
     case_id: Mapped[UUID] = mapped_column(
         ForeignKey("cases.id", ondelete="CASCADE"),

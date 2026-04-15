@@ -12,7 +12,11 @@ from ops_agent.infrastructure.db.models.base import BaseModel, mvp_info
 
 class AuditEvent(BaseModel):
     __tablename__ = "audit_events"
-    __table_args__ = (Index("ix_audit_events_case_id_occurred_at", "case_id", "occurred_at"),)
+    __table_args__ = (
+        Index("ix_audit_events_case_id_occurred_at", "case_id", "occurred_at"),
+        Index("ix_audit_events_case_id_event_type", "case_id", "event_type"),
+        Index("ix_audit_events_resource_type_resource_id", "resource_type", "resource_id"),
+    )
 
     case_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("cases.id", ondelete="CASCADE"),

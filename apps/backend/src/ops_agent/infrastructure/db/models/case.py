@@ -15,6 +15,8 @@ class Case(BaseModel):
     __table_args__ = (
         UniqueConstraint("case_reference", name="uq_cases_case_reference"),
         Index("ix_cases_status", "status"),
+        Index("ix_cases_current_queue_status", "current_queue", "status"),
+        Index("ix_cases_case_type", "case_type"),
     )
 
     case_reference: Mapped[str] = mapped_column(

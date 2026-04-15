@@ -222,6 +222,8 @@ def upgrade() -> None:
         sa.UniqueConstraint("case_reference", name="uq_cases_case_reference"),
     )
     op.create_index("ix_cases_status", "cases", ["status"], unique=False)
+    op.create_index("ix_cases_current_queue_status", "cases", ["current_queue", "status"], unique=False)
+    op.create_index("ix_cases_case_type", "cases", ["case_type"], unique=False)
 
     op.create_table(
         "documents",
@@ -252,8 +254,10 @@ def upgrade() -> None:
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_documents")),
+        sa.UniqueConstraint("storage_key", name="uq_documents_storage_key"),
     )
     op.create_index("ix_documents_case_id_status", "documents", ["case_id", "status"], unique=False)
+    op.create_index("ix_documents_sha256_digest", "documents", ["sha256_digest"], unique=False)
 
     op.create_table(
         "ocr_results",
@@ -309,6 +313,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_extraction_results")),
     )
     op.create_index("ix_extraction_results_document_status", "extraction_results", ["document_id", "status"], unique=False)
+    op.create_index("ix_extraction_results_schema_name", "extraction_results", ["schema_name"], unique=False)
 
     op.create_table(
         "validation_findings",
@@ -343,6 +348,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_validation_findings")),
     )
     op.create_index("ix_validation_findings_case_status", "validation_findings", ["case_id", "status"], unique=False)
+    op.create_index("ix_validation_findings_extraction_result_id", "validation_findings", ["extraction_result_id"], unique=False)
 
     op.create_table(
         "risk_findings",
@@ -448,6 +454,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_decisions")),
     )
     op.create_index("ix_decisions_case_id", "decisions", ["case_id"], unique=False)
+    op.create_index("ix_decisions_outcome", "decisions", ["outcome"], unique=False)
 
     op.create_table(
         "manual_review_actions",
@@ -486,6 +493,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_manual_review_actions")),
     )
     op.create_index("ix_manual_review_actions_case_id", "manual_review_actions", ["case_id"], unique=False)
+    op.create_index("ix_manual_review_actions_case_id_created_at", "manual_review_actions", ["case_id", "created_at"], unique=False)
 
     op.create_table(
         "audit_events",
@@ -510,15 +518,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_events")),
     )
     op.create_index("ix_audit_events_case_id_occurred_at", "audit_events", ["case_id", "occurred_at"], unique=False)
+    op.create_index("ix_audit_events_case_id_event_type", "audit_events", ["case_id", "event_type"], unique=False)
+    op.create_index("ix_audit_events_resource_type_resource_id", "audit_events", ["resource_type", "resource_id"], unique=False)
 
 
 def downgrade() -> None:
+    op.drop_index("ix_audit_events_resource_type_resource_id", table_name="audit_events")
+    op.drop_index("ix_audit_events_case_id_event_type", table_name="audit_events")
     op.drop_index("ix_audit_events_case_id_occurred_at", table_name="audit_events")
     op.drop_table("audit_events")
 
+    op.drop_index("ix_manual_review_actions_case_id_created_at", table_name="manual_review_actions")
     op.drop_index("ix_manual_review_actions_case_id", table_name="manual_review_actions")
     op.drop_table("manual_review_actions")
 
+    op.drop_index("ix_decisions_outcome", table_name="decisions")
     op.drop_index("ix_decisions_case_id", table_name="decisions")
     op.drop_table("decisions")
 
@@ -528,18 +542,23 @@ def downgrade() -> None:
     op.drop_index("ix_risk_findings_case_status", table_name="risk_findings")
     op.drop_table("risk_findings")
 
+    op.drop_index("ix_validation_findings_extraction_result_id", table_name="validation_findings")
     op.drop_index("ix_validation_findings_case_status", table_name="validation_findings")
     op.drop_table("validation_findings")
 
+    op.drop_index("ix_extraction_results_schema_name", table_name="extraction_results")
     op.drop_index("ix_extraction_results_document_status", table_name="extraction_results")
     op.drop_table("extraction_results")
 
     op.drop_index("ix_ocr_results_document_status", table_name="ocr_results")
     op.drop_table("ocr_results")
 
+    op.drop_index("ix_documents_sha256_digest", table_name="documents")
     op.drop_index("ix_documents_case_id_status", table_name="documents")
     op.drop_table("documents")
 
+    op.drop_index("ix_cases_case_type", table_name="cases")
+    op.drop_index("ix_cases_current_queue_status", table_name="cases")
     op.drop_index("ix_cases_status", table_name="cases")
     op.drop_table("cases")
 
