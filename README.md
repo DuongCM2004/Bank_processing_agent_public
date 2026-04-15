@@ -44,3 +44,8 @@ py -m uvicorn ops_agent.main:app --reload --app-dir src
 ```powershell
 py -m pytest
 ```
+
+## Target Monorepo Structure
+
+The repo now includes a target MVP-first monorepo scaffold under `apps/`, `packages/`, `infra/`, and `tooling/`.
+Use [docs/repository-structure.md](docs/repository-structure.md) as the source of truth for folder ownership, naming conventions, and migration targets.
