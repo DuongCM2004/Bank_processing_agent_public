@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import UniqueConstraint, inspect as sa_inspect
 
 from ops_agent.infrastructure.db.base import Base
 from ops_agent.infrastructure.db.models import (
@@ -75,3 +75,29 @@ def test_mvp_and_future_field_metadata_are_marked() -> None:
     assert RiskFinding.__table__.c.risk_score.info["delivery_phase"] == "future"
     assert ComplianceFinding.__table__.c.regulation_reference.info["delivery_phase"] == "future"
     assert ManualReviewAction.__table__.c.payload.info["delivery_phase"] == "mvp_required"
+
+
+def test_mvp_indexes_and_constraints_support_ops_lookup_patterns() -> None:
+    case_indexes = {index.name for index in Case.__table__.indexes}
+    document_indexes = {index.name for index in Document.__table__.indexes}
+    extraction_indexes = {index.name for index in ExtractionResult.__table__.indexes}
+    validation_indexes = {index.name for index in ValidationFinding.__table__.indexes}
+    decision_indexes = {index.name for index in Decision.__table__.indexes}
+    manual_review_indexes = {index.name for index in ManualReviewAction.__table__.indexes}
+    audit_indexes = {index.name for index in AuditEvent.__table__.indexes}
+    document_unique_constraints = {
+        constraint.name for constraint in Document.__table__.constraints if isinstance(constraint, UniqueConstraint)
+    }
+
+    assert {"ix_cases_status", "ix_cases_current_queue_status", "ix_cases_case_type"}.issubset(case_indexes)
+    assert {"ix_documents_case_id_status", "ix_documents_sha256_digest"}.issubset(document_indexes)
+    assert {"uq_documents_storage_key"}.issubset(document_unique_constraints)
+    assert {"ix_extraction_results_document_status", "ix_extraction_results_schema_name"}.issubset(extraction_indexes)
+    assert {"ix_validation_findings_case_status", "ix_validation_findings_extraction_result_id"}.issubset(validation_indexes)
+    assert {"ix_decisions_case_id", "ix_decisions_outcome"}.issubset(decision_indexes)
+    assert {"ix_manual_review_actions_case_id", "ix_manual_review_actions_case_id_created_at"}.issubset(manual_review_indexes)
+    assert {
+        "ix_audit_events_case_id_occurred_at",
+        "ix_audit_events_case_id_event_type",
+        "ix_audit_events_resource_type_resource_id",
+    }.issubset(audit_indexes)
