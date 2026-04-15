@@ -3,12 +3,21 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 
 from ops_agent.api.dependencies import SystemHealthServiceDep
+from ops_agent.api.openapi import error_responses
 from ops_agent.api.schemas import HealthcheckResponse
 
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-@router.get("", response_model=HealthcheckResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=HealthcheckResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Read service health",
+    description="Returns the backend service health status and per-dependency health checks for monitoring and readiness probes.",
+    operation_id="readHealthcheck",
+    responses=error_responses(500),
+)
 def read_healthcheck(health_service: SystemHealthServiceDep) -> HealthcheckResponse:
     overall_status, checks = health_service.get_health_status()
     return HealthcheckResponse(
@@ -16,4 +25,3 @@ def read_healthcheck(health_service: SystemHealthServiceDep) -> HealthcheckRespo
         service="ops-agent-backend",
         checks=checks,
     )
-

@@ -5,13 +5,22 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 
 from ops_agent.api.dependencies import AuditServiceDep
+from ops_agent.api.openapi import error_responses
 from ops_agent.api.schemas import AuditEventListResponse
 from ops_agent.domain.shared.enums import AuditActorType, AuditEventType
 
 router = APIRouter(prefix="/cases/{case_id}/audit-events", tags=["audit-events"])
 
 
-@router.get("", response_model=AuditEventListResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=AuditEventListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List case audit events",
+    description="Lists structured audit events for a case with optional filters by event type, actor type, and target resource type.",
+    operation_id="listCaseAuditEvents",
+    responses=error_responses(404, 422, 500),
+)
 def list_case_audit_events(
     case_id: UUID,
     audit_service: AuditServiceDep,

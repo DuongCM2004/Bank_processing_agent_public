@@ -7,18 +7,35 @@ from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
 
 from ops_agent.api.dependencies import DocumentAccessServiceDep, DocumentUploadServiceDep
+from ops_agent.api.openapi import error_responses, merge_responses
 from ops_agent.api.schemas import DocumentListResponse, DocumentUploadMetadataResponse, DocumentUploadRequest
 from ops_agent.application.services.document_upload import parse_upload_metadata
 
 router = APIRouter(prefix="/cases/{case_id}/documents", tags=["documents"])
 
 
-@router.get("", response_model=DocumentListResponse)
+@router.get(
+    "",
+    response_model=DocumentListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List case documents",
+    description="Lists document metadata currently associated with a case.",
+    operation_id="listCaseDocuments",
+    responses=error_responses(404, 422, 500),
+)
 def list_case_documents(case_id: UUID, document_service: DocumentAccessServiceDep) -> DocumentListResponse:
     return document_service.list_case_documents(case_id=case_id)
 
 
-@router.post("", response_model=DocumentUploadMetadataResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DocumentUploadMetadataResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload case document",
+    description="Uploads a document file, stores it through the configured storage backend, persists metadata, and links it to the case.",
+    operation_id="uploadCaseDocument",
+    responses=error_responses(404, 409, 413, 415, 422, 500),
+)
 async def upload_document(
     case_id: UUID,
     document_service: DocumentUploadServiceDep,
@@ -37,7 +54,15 @@ async def upload_document(
     return await document_service.upload_document(case_id=case_id, upload=file, request=request)
 
 
-@router.get("/{document_id}", response_model=DocumentUploadMetadataResponse)
+@router.get(
+    "/{document_id}",
+    response_model=DocumentUploadMetadataResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get case document",
+    description="Returns stored metadata for a specific document linked to the case.",
+    operation_id="getCaseDocument",
+    responses=error_responses(404, 422, 500),
+)
 def get_case_document(
     case_id: UUID,
     document_id: UUID,
@@ -46,7 +71,29 @@ def get_case_document(
     return document_service.get_document_metadata(case_id=case_id, document_id=document_id)
 
 
-@router.get("/{document_id}/download")
+@router.get(
+    "/{document_id}/download",
+    status_code=status.HTTP_200_OK,
+    summary="Download case document",
+    description="Streams the stored file content for a case document and records an audit event for the download.",
+    operation_id="downloadCaseDocument",
+    responses=merge_responses(
+        {
+            200: {
+                "description": "Binary file stream",
+                "content": {
+                    "application/octet-stream": {
+                        "schema": {
+                            "type": "string",
+                            "format": "binary",
+                        }
+                    }
+                },
+            }
+        },
+        error_responses(404, 409, 422, 500),
+    ),
+)
 def download_case_document(
     case_id: UUID,
     document_id: UUID,

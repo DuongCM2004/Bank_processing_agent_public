@@ -469,3 +469,7 @@ class ErrorResponse(APIModel):
     message: str
     trace_id: str | None = None
     details: list[ErrorDetailResponse] = Field(default_factory=list)
+
+
+class ErrorEnvelope(APIModel):
+    error: ErrorResponse

@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 
 from ops_agent.api.dependencies import CaseManagementServiceDep
+from ops_agent.api.openapi import error_responses
 from ops_agent.api.schemas import (
     CaseCreateRequest,
     CaseCreateResponse,
@@ -19,12 +20,28 @@ from ops_agent.domain.shared.enums import CaseStatus
 router = APIRouter(prefix="/cases", tags=["cases"])
 
 
-@router.post("", response_model=CaseCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CaseCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create case",
+    description="Creates a new case and optionally registers initial document metadata supplied during intake.",
+    operation_id="createCase",
+    responses=error_responses(400, 409, 422, 500),
+)
 def create_case(request: CaseCreateRequest, case_service: CaseManagementServiceDep) -> CaseCreateResponse:
     return case_service.create_case(request)
 
 
-@router.get("", response_model=CaseListResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=CaseListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List cases",
+    description="Lists cases for operations users with pagination and optional status or queue filters.",
+    operation_id="listCases",
+    responses=error_responses(422, 500),
+)
 def list_cases(
     case_service: CaseManagementServiceDep,
     limit: int = Query(default=20, ge=1, le=100),
@@ -42,17 +59,41 @@ def list_cases(
     )
 
 
-@router.get("/{case_id}", response_model=CaseSummaryResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/{case_id}",
+    response_model=CaseSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get case summary",
+    description="Returns the top-level case summary used for list-to-detail navigation.",
+    operation_id="getCase",
+    responses=error_responses(404, 422, 500),
+)
 def get_case(case_id: UUID, case_service: CaseManagementServiceDep) -> CaseSummaryResponse:
     return case_service.get_case(case_id)
 
 
-@router.get("/{case_id}/detail", response_model=CaseDetailResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/{case_id}/detail",
+    response_model=CaseDetailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get case detail",
+    description="Returns a frontend-ready case detail view including linked documents, processing results, findings, decisions, manual review actions, and audit events.",
+    operation_id="getCaseDetail",
+    responses=error_responses(404, 422, 500),
+)
 def get_case_detail(case_id: UUID, case_service: CaseManagementServiceDep) -> CaseDetailResponse:
     return case_service.get_case_detail(case_id)
 
 
-@router.patch("/{case_id}/status", response_model=UpdateCaseStatusResponse, status_code=status.HTTP_200_OK)
+@router.patch(
+    "/{case_id}/status",
+    response_model=UpdateCaseStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update case status",
+    description="Applies an explicit case workflow transition through the safe workflow service. Direct status mutation is not supported.",
+    operation_id="updateCaseStatus",
+    responses=error_responses(404, 409, 422, 500),
+)
 def update_case_status(
     case_id: UUID,
     request: UpdateCaseStatusRequest,

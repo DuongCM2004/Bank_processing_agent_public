@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ops_agent.api.error_handlers import register_exception_handlers
+from ops_agent.api.openapi import API_DESCRIPTION, OPENAPI_TAGS
 from ops_agent.api.router import api_router
 from ops_agent.config import AppSettings, get_settings
 from ops_agent.infrastructure.logging.setup import configure_logging
@@ -28,6 +29,9 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     app = FastAPI(
         title=app_settings.app_name,
         version="0.1.0",
+        summary="Banking document processing backend MVP",
+        description=API_DESCRIPTION,
+        openapi_tags=OPENAPI_TAGS,
         debug=app_settings.debug,
         openapi_url=f"{app_settings.api.v1_prefix}/openapi.json",
         docs_url=f"{app_settings.api.v1_prefix}/docs",
