@@ -1,15 +1,48 @@
 # Web
 
-Operations dashboard for banking document review.
+Operations dashboard scaffold for banking document review.
 
-Expected stack:
+Stack:
 
-- React + TypeScript + Vite
+- React 18
+- TypeScript
+- Vite
 - TailwindCSS
-- feature-oriented UI modules for review queue, case workspace, audit history, and manual decisions
+- React Router
+- TanStack Query
+- Vitest + React Testing Library
+
+Project structure:
+
+```text
+apps/web/
+├─ public/
+├─ src/
+│  ├─ api/
+│  ├─ app/
+│  ├─ components/
+│  │  ├─ layout/
+│  │  └─ ui/
+│  ├─ features/
+│  │  ├─ audit/
+│  │  ├─ cases/
+│  │  ├─ documents/
+│  │  └─ review/
+│  ├─ pages/
+│  │  ├─ audit/
+│  │  ├─ cases/
+│  │  ├─ dashboard/
+│  │  ├─ not-found/
+│  │  ├─ review/
+│  │  └─ settings/
+│  ├─ styles/
+│  └─ lib/
+├─ tests/
+└─ package.json
+```
 
 Design rules:
 
-- optimize for operational clarity over visual novelty
-- make workflow status and validation issues obvious
-- isolate API clients and transport logic from components
+- optimize for dashboard-style operations work
+- keep route handlers and API transport concerns separate from presentational components
+- make workflow status, findings, and audit context easy to scan
