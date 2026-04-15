@@ -36,3 +36,6 @@ build/
 # Env
 .env
 .env.local
+
+# Runtime generated
+.runtime/

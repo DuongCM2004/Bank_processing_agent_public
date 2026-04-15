@@ -33,3 +33,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+  "unit: fast isolated unit-level coverage",
+  "integration: api and persistence coverage against the test application",
+  "contract: openapi and interface compatibility checks",
+]
