@@ -1,0 +1,114 @@
+name: ops-agent
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ops-agent-postgres
+    environment:
+      POSTGRES_DB: ops_agent
+      POSTGRES_USER: ops_agent
+      POSTGRES_PASSWORD: ops_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ops_agent -d ops_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ops_agent_local
+
+  redis:
+    image: redis:7-alpine
+    container_name: ops-agent-redis
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ops_agent_local
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: dev
+    container_name: ops-agent-backend
+    env_file:
+      - ./apps/backend/.env.example
+    environment:
+      OPS_AGENT_ENV: local
+      OPS_AGENT_DEBUG: "true"
+      OPS_AGENT_POSTGRES_DSN: postgresql+psycopg://ops_agent:ops_agent@postgres:5432/ops_agent
+      OPS_AGENT_REDIS_URL: redis://redis:6379/0
+      OPS_AGENT_CORS_ORIGINS: http://localhost:5173,http://frontend:5173
+      OPS_AGENT_STORAGE_ROOT_PATH: /app/.runtime/uploads
+    working_dir: /app/apps/backend
+    command: >
+      sh -c "python -m alembic upgrade head &&
+             python -m uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - backend_uploads:/app/.runtime/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/api/v1/health', timeout=2)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - ops_agent_local
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: ops-agent-frontend
+    env_file:
+      - ./apps/web/.env.example
+    environment:
+      VITE_OPS_AGENT_API_BASE_URL: http://localhost:8003/api/v1
+      CHOKIDAR_USEPOLLING: "true"
+    working_dir: /app/apps/web
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - web_node_modules:/app/apps/web/node_modules
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ops_agent_local
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
+  web_node_modules:
+
+networks:
+  ops_agent_local:
+    driver: bridge
