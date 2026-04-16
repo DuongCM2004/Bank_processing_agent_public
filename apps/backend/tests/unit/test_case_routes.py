@@ -204,6 +204,48 @@ def test_upload_document_endpoint_persists_file_and_metadata(client, db_session,
     assert case.status == CaseStatus.DOCUMENTS_UPLOADED
 
 
+def test_upload_document_sanitizes_filename_before_persistence_and_storage(client, test_settings) -> None:
+    create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
+    case_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/cases/{case_id}/documents",
+        data={"document_type": "bank_statement"},
+        files={"file": ("bank statement (Q1).pdf", b"fake-pdf-content", "application/pdf")},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["filename"] == "bank_statement_Q1_.pdf"
+    assert payload["storage_key"].endswith("/bank_statement_Q1_.pdf")
+
+    stored_path = test_settings.storage.root_path.resolve() / Path(*payload["storage_key"].split("/"))
+    assert stored_path.exists()
+
+
+def test_upload_document_rejects_unsafe_filename_and_emits_audit_event(client, db_session) -> None:
+    create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
+    case_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/cases/{case_id}/documents",
+        data={"document_type": "bank_statement"},
+        files={"file": ("../statement.pdf", b"fake-pdf-content", "application/pdf")},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "invalid_upload_filename"
+
+    rejected_audits = [
+        event
+        for event in db_session.query(AuditEvent).filter(AuditEvent.case_id == UUID(case_id)).all()
+        if event.event_type == AuditEventType.DOCUMENT_UPLOAD_REJECTED
+    ]
+    assert len(rejected_audits) == 1
+    assert rejected_audits[0].details["reason_code"] == "invalid_upload_filename"
+    assert rejected_audits[0].details["malware_scan_status"] == "not_scanned"
+
+
 def test_upload_document_rejects_unsupported_media_type(client) -> None:
     create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
     case_id = create_response.json()["id"]
@@ -218,7 +260,29 @@ def test_upload_document_rejects_unsupported_media_type(client) -> None:
     assert response.json()["error"]["code"] == "unsupported_media_type"
 
 
-def test_upload_document_rejects_large_payload(client, test_settings) -> None:
+def test_upload_document_rejects_unsupported_media_type_and_emits_audit_event(client, db_session) -> None:
+    create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
+    case_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/cases/{case_id}/documents",
+        data={"document_type": "bank_statement"},
+        files={"file": ("statement.txt", b"plain-text", "text/plain")},
+    )
+
+    assert response.status_code == 415
+
+    rejected_audits = [
+        event
+        for event in db_session.query(AuditEvent).filter(AuditEvent.case_id == UUID(case_id)).all()
+        if event.event_type == AuditEventType.DOCUMENT_UPLOAD_REJECTED
+    ]
+    assert len(rejected_audits) == 1
+    assert rejected_audits[0].details["reason_code"] == "unsupported_media_type"
+    assert rejected_audits[0].details["mime_type"] == "text/plain"
+
+
+def test_upload_document_rejects_large_payload(client, db_session, test_settings) -> None:
     create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
     case_id = create_response.json()["id"]
     oversized_content = b"x" * (test_settings.storage.max_upload_bytes + 1)
@@ -231,6 +295,14 @@ def test_upload_document_rejects_large_payload(client, test_settings) -> None:
 
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "payload_too_large"
+
+    rejected_audits = [
+        event
+        for event in db_session.query(AuditEvent).filter(AuditEvent.case_id == UUID(case_id)).all()
+        if event.event_type == AuditEventType.DOCUMENT_UPLOAD_REJECTED
+    ]
+    assert len(rejected_audits) == 1
+    assert rejected_audits[0].details["reason_code"] == "payload_too_large"
 
 
 def test_list_case_documents_returns_uploaded_documents(client) -> None:

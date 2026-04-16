@@ -38,6 +38,8 @@ OPENAPI_TAGS = [
 
 ERROR_SPECS: dict[int, tuple[str, str, str]] = {
     400: ("Bad Request", "bad_request", "The request could not be processed."),
+    401: ("Unauthorized", "authentication_required", "Authentication is required for this operation."),
+    403: ("Forbidden", "permission_denied", "The authenticated principal is not authorized for this operation."),
     404: ("Not Found", "resource_not_found", "The requested resource was not found."),
     409: ("Conflict", "conflict", "The request conflicts with the current resource state."),
     413: ("Payload Too Large", "payload_too_large", "The uploaded payload exceeds the configured size limit."),

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, PostgresDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, PostgresDsn, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class ApiSettings(BaseModel):
     v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = Field(default_factory=list)
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
 
 class DatabaseSettings(BaseModel):
@@ -33,6 +33,9 @@ class WorkerSettings(BaseModel):
 
 class AIIntegrationSettings(BaseModel):
     provider_mode: Literal["placeholder", "disabled", "external"] = "placeholder"
+    provider_endpoint: str | None = None
+    provider_api_key: str | None = Field(default=None, repr=False)
+    provider_timeout_seconds: int = 30
 
 
 class ProcessingSettings(BaseModel):
@@ -48,6 +51,9 @@ class StorageSettings(BaseModel):
     allowed_mime_types: list[str] = Field(
         default_factory=lambda: ["application/pdf", "image/png", "image/jpeg"]
     )
+    blob_endpoint: str | None = None
+    blob_bucket: str | None = None
+    kms_key_id: str | None = None
 
 
 class FeatureFlags(BaseModel):
@@ -56,11 +62,11 @@ class FeatureFlags(BaseModel):
 
 class AppSettings(BaseSettings):
     app_name: str = "Ops Agent Backend"
-    env: Literal["local", "test", "staging", "production"] = "local"
+    env: Literal["local", "test", "development", "staging", "production"] = "local"
     debug: bool = False
 
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = Field(default_factory=list)
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     postgres_dsn: PostgresDsn = Field(
         default="postgresql+psycopg://ops_agent:ops_agent@localhost:5432/ops_agent"
@@ -76,15 +82,21 @@ class AppSettings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     task_queue_name: str = "ops-agent-default"
     ai_provider_mode: Literal["placeholder", "disabled", "external"] = "placeholder"
+    ai_provider_endpoint: str | None = None
+    ai_provider_api_key: str | None = Field(default=None, repr=False)
+    ai_provider_timeout_seconds: int = 30
     processing_max_retry_attempts: int = 3
     processing_min_ocr_confidence: float = 0.75
     processing_min_extraction_confidence: float = 0.8
     storage_backend: Literal["local", "blob_placeholder"] = "local"
     storage_root_path: Path = Path("./.runtime/uploads")
     max_upload_bytes: int = 15 * 1024 * 1024
-    allowed_upload_mime_types: list[str] = Field(
+    allowed_upload_mime_types: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["application/pdf", "image/png", "image/jpeg"]
     )
+    storage_blob_endpoint: str | None = None
+    storage_blob_bucket: str | None = None
+    storage_kms_key_id: str | None = None
     enable_db_healthcheck: bool = True
 
     model_config = SettingsConfigDict(
@@ -93,6 +105,14 @@ class AppSettings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("cors_origins", "allowed_upload_mime_types", mode="before")
+    @classmethod
+    def parse_csv_list(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+
+        return value
 
     @property
     def api(self) -> ApiSettings:
@@ -118,7 +138,12 @@ class AppSettings(BaseSettings):
 
     @property
     def ai(self) -> AIIntegrationSettings:
-        return AIIntegrationSettings(provider_mode=self.ai_provider_mode)
+        return AIIntegrationSettings(
+            provider_mode=self.ai_provider_mode,
+            provider_endpoint=self.ai_provider_endpoint,
+            provider_api_key=self.ai_provider_api_key,
+            provider_timeout_seconds=self.ai_provider_timeout_seconds,
+        )
 
     @property
     def processing(self) -> ProcessingSettings:
@@ -135,6 +160,9 @@ class AppSettings(BaseSettings):
             root_path=self.storage_root_path,
             max_upload_bytes=self.max_upload_bytes,
             allowed_mime_types=self.allowed_upload_mime_types,
+            blob_endpoint=self.storage_blob_endpoint,
+            blob_bucket=self.storage_blob_bucket,
+            kms_key_id=self.storage_kms_key_id,
         )
 
     @property

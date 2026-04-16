@@ -29,3 +29,11 @@ py -m alembic upgrade head
 py -m alembic revision --autogenerate -m "describe change"
 py -m alembic downgrade -1
 ```
+
+Environment configuration:
+
+- Local backend defaults live in `.env.example`.
+- Environment-level templates live in `../../infra/environments/`.
+- Backend variables use the `OPS_AGENT_` prefix.
+- `OPS_AGENT_POSTGRES_DSN`, `OPS_AGENT_REDIS_URL`, `OPS_AGENT_AI_PROVIDER_API_KEY`, and key-management references should come from a secret store outside local development.
+- List values such as `OPS_AGENT_CORS_ORIGINS` and `OPS_AGENT_ALLOWED_UPLOAD_MIME_TYPES` may be comma-separated in `.env` files.

@@ -5,6 +5,7 @@ description = "FastAPI backend for the banking-grade document processing Ops Age
 requires-python = ">=3.13"
 dependencies = [
   "alembic>=1.16.0,<2.0.0",
+  "celery[redis]>=5.4.0,<6.0.0",
   "fastapi>=0.115.0,<1.0.0",
   "pydantic>=2.9.0,<3.0.0",
   "pydantic-settings>=2.6.0,<3.0.0",
@@ -18,6 +19,7 @@ dependencies = [
 dev = [
   "httpx>=0.27.0,<1.0.0",
   "pytest>=8.3.0,<9.0.0",
+  "ruff>=0.8.0,<1.0.0",
 ]
 
 [build-system]
@@ -25,17 +27,27 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["app*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+pythonpath = ["."]
+testpaths = ["app/tests"]
 addopts = ["--strict-markers"]
 markers = [
   "unit: fast isolated unit-level coverage",
   "integration: api and persistence coverage against the test application",
   "contract: openapi and interface compatibility checks",
 ]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["app"]
+
+[tool.ruff.lint]
+select = ["F", "B", "UP"]
+ignore = ["B008"]

@@ -36,6 +36,13 @@ build/
 # Env
 .env
 .env.local
+.env.*
+!.env.example
+apps/**/.env
+apps/**/.env.local
+infra/environments/*.env
+infra/environments/*.secrets.env
+!infra/environments/*.env.example
 
 # Runtime generated
 .runtime/

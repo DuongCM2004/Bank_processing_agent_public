@@ -39,6 +39,14 @@ py -m pip install -e .[dev]
 py -m uvicorn ops_agent.main:app --reload --app-dir src
 ```
 
+## Run Local Docker Stack
+
+```powershell
+docker compose up --build
+```
+
+See [infra/docker/README.md](infra/docker/README.md) for ports, volumes, local networking, and reset commands.
+
 ## Test
 
 ```powershell

@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from ops_agent.app import create_app
 from ops_agent.api.dependencies import get_app_settings
 from ops_agent.config import AppSettings, get_settings
+from ops_agent.domain.shared.enums import RoleCode
 from ops_agent.infrastructure.db.base import Base
 from ops_agent.infrastructure.db import models as db_models  # noqa: F401
 from ops_agent.infrastructure.db.session import get_db_session
+from ops_agent.security.rbac import Principal, get_current_principal
 
 
 DEFAULT_TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
@@ -107,6 +109,11 @@ def test_app(test_settings: AppSettings, db_session: Session):
     app.dependency_overrides[get_settings] = lambda: test_settings
     app.dependency_overrides[get_app_settings] = lambda: test_settings
     app.dependency_overrides[get_db_session] = lambda: db_session
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="test-admin",
+        roles=frozenset({RoleCode.ADMIN}),
+        display_name="Test Admin",
+    )
 
     yield app
     app.dependency_overrides.clear()
