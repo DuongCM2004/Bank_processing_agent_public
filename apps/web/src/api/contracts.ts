@@ -31,6 +31,7 @@ export type AuditActorType = "system" | "user" | "service";
 export type AuditEventType =
   | "case_created"
   | "document_added"
+  | "document_upload_rejected"
   | "document_downloaded"
   | "ocr_completed"
   | "extraction_completed"

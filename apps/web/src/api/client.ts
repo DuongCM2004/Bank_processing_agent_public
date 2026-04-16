@@ -1,9 +1,6 @@
 import type { ApiErrorEnvelope } from "@/api/contracts";
 import { ApiError } from "@/api/errors";
-
-function getApiBaseUrl() {
-  return (import.meta.env.VITE_API_BASE_URL ?? "/api/v1").replace(/\/$/, "");
-}
+import { frontendConfig } from "@/config/env";
 
 type QueryValue = string | number | boolean | null | undefined;
 
@@ -81,4 +78,4 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient(getApiBaseUrl());
+export const apiClient = new ApiClient(frontendConfig.apiBaseUrl);
