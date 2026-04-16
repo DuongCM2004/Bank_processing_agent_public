@@ -6,9 +6,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from ops_agent.config import get_settings
-from ops_agent.infrastructure.db.base import Base
-from ops_agent.infrastructure.db import models  # noqa: F401
+from app.core.config import get_settings
+from app.db.base import Base
+from app import models  # noqa: F401
 
 config = context.config
 logger = logging.getLogger("alembic.env")
@@ -20,7 +20,7 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return str(get_settings().database.dsn)
+    return get_settings().postgres_dsn
 
 
 def process_revision_directives(context_, revision, directives) -> None:

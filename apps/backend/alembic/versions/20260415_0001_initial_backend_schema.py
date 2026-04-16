@@ -114,6 +114,7 @@ audit_actor_type_enum = sa.Enum(
 audit_event_type_enum = sa.Enum(
     "case_created",
     "document_added",
+    "document_upload_rejected",
     "document_downloaded",
     "ocr_completed",
     "extraction_completed",
@@ -132,11 +133,10 @@ user_status_enum = sa.Enum(
     native_enum=False,
 )
 role_code_enum = sa.Enum(
-    "ops_reviewer",
-    "ops_supervisor",
-    "compliance_officer",
-    "risk_analyst",
-    "platform_admin",
+    "ops_user",
+    "reviewer",
+    "compliance_user",
+    "admin",
     name="rolecode",
     native_enum=False,
 )
