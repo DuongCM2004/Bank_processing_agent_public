@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from ops_agent.api.dependencies import AuditServiceDep
 from ops_agent.api.openapi import error_responses
 from ops_agent.api.schemas import AuditEventListResponse
 from ops_agent.domain.shared.enums import AuditActorType, AuditEventType
+from ops_agent.security.rbac import Permission, require_permission
 
 router = APIRouter(prefix="/cases/{case_id}/audit-events", tags=["audit-events"])
 
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/cases/{case_id}/audit-events", tags=["audit-events"]
     summary="List case audit events",
     description="Lists structured audit events for a case with optional filters by event type, actor type, and target resource type.",
     operation_id="listCaseAuditEvents",
-    responses=error_responses(404, 422, 500),
+    responses=error_responses(401, 403, 404, 422, 500),
+    dependencies=[Depends(require_permission(Permission.AUDIT_READ))],
 )
 def list_case_audit_events(
     case_id: UUID,

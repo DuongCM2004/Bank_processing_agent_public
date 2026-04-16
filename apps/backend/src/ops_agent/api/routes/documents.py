@@ -3,13 +3,14 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
 
 from ops_agent.api.dependencies import DocumentAccessServiceDep, DocumentUploadServiceDep
 from ops_agent.api.openapi import error_responses, merge_responses
 from ops_agent.api.schemas import DocumentListResponse, DocumentUploadMetadataResponse, DocumentUploadRequest
 from ops_agent.application.services.document_upload import parse_upload_metadata
+from ops_agent.security.rbac import Permission, require_permission
 
 router = APIRouter(prefix="/cases/{case_id}/documents", tags=["documents"])
 
@@ -21,7 +22,8 @@ router = APIRouter(prefix="/cases/{case_id}/documents", tags=["documents"])
     summary="List case documents",
     description="Lists document metadata currently associated with a case.",
     operation_id="listCaseDocuments",
-    responses=error_responses(404, 422, 500),
+    responses=error_responses(401, 403, 404, 422, 500),
+    dependencies=[Depends(require_permission(Permission.DOCUMENT_READ))],
 )
 def list_case_documents(case_id: UUID, document_service: DocumentAccessServiceDep) -> DocumentListResponse:
     return document_service.list_case_documents(case_id=case_id)
@@ -34,7 +36,8 @@ def list_case_documents(case_id: UUID, document_service: DocumentAccessServiceDe
     summary="Upload case document",
     description="Uploads a document file, stores it through the configured storage backend, persists metadata, and links it to the case.",
     operation_id="uploadCaseDocument",
-    responses=error_responses(404, 409, 413, 415, 422, 500),
+    responses=error_responses(401, 403, 404, 409, 413, 415, 422, 500),
+    dependencies=[Depends(require_permission(Permission.DOCUMENT_UPLOAD))],
 )
 async def upload_document(
     case_id: UUID,
@@ -61,7 +64,8 @@ async def upload_document(
     summary="Get case document",
     description="Returns stored metadata for a specific document linked to the case.",
     operation_id="getCaseDocument",
-    responses=error_responses(404, 422, 500),
+    responses=error_responses(401, 403, 404, 422, 500),
+    dependencies=[Depends(require_permission(Permission.DOCUMENT_READ))],
 )
 def get_case_document(
     case_id: UUID,
@@ -91,8 +95,9 @@ def get_case_document(
                 },
             }
         },
-        error_responses(404, 409, 422, 500),
+        error_responses(401, 403, 404, 409, 422, 500),
     ),
+    dependencies=[Depends(require_permission(Permission.DOCUMENT_DOWNLOAD))],
 )
 def download_case_document(
     case_id: UUID,
