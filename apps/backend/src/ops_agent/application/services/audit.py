@@ -125,6 +125,48 @@ class AuditService:
             )
         )
 
+    def record_document_upload_rejected(
+        self,
+        *,
+        case_id: UUID,
+        actor_user_id: UUID | None,
+        actor_identifier: str,
+        actor_type: AuditActorType,
+        filename: str | None,
+        mime_type: str | None,
+        file_size_bytes: int,
+        reason_code: str,
+        reason_message: str,
+        document_type: str,
+        source_channel: str,
+        occurred_at: datetime,
+    ) -> AuditEvent:
+        return self.record_event(
+            AuditEventCommand(
+                event_type=AuditEventType.DOCUMENT_UPLOAD_REJECTED,
+                summary=f"Document upload was rejected for reason '{reason_code}'.",
+                target=AuditTarget(resource_type="case", resource_id=case_id, case_id=case_id),
+                actor=AuditActor(
+                    actor_type=actor_type,
+                    actor_identifier=actor_identifier,
+                    actor_user_id=actor_user_id,
+                ),
+                metadata_payload={
+                    "filename": filename,
+                    "mime_type": mime_type,
+                    "file_size_bytes": file_size_bytes,
+                    "reason_code": reason_code,
+                    "reason_message": reason_message,
+                    "document_type": document_type,
+                    "source_channel": source_channel,
+                    "malware_scan_status": "not_scanned",
+                },
+                occurred_at=occurred_at,
+                created_by=actor_identifier,
+                updated_by=actor_identifier,
+            )
+        )
+
     def record_manual_review_action(
         self,
         *,

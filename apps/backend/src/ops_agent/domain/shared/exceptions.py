@@ -25,6 +25,20 @@ class ConflictError(OpsAgentError):
         super().__init__(message, error_code=error_code, status_code=409)
 
 
+class AuthenticationRequiredError(OpsAgentError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Authentication is required for this operation.",
+            error_code="authentication_required",
+            status_code=401,
+        )
+
+
+class AuthorizationError(OpsAgentError):
+    def __init__(self, message: str = "The authenticated principal is not authorized for this operation.") -> None:
+        super().__init__(message, error_code="permission_denied", status_code=403)
+
+
 class PayloadTooLargeError(OpsAgentError):
     def __init__(self, message: str) -> None:
         super().__init__(message, error_code="payload_too_large", status_code=413)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -9,10 +10,11 @@ from fastapi import UploadFile
 from ops_agent.api.schemas import DocumentUploadMetadataResponse, DocumentUploadRequest
 from ops_agent.application.services.audit import AuditService
 from ops_agent.application.services.case_workflow import CaseWorkflowService
+from ops_agent.application.services.upload_validation import validate_upload_file
 from ops_agent.domain.workflow import CaseTransitionContext
 from ops_agent.config import StorageSettings
-from ops_agent.domain.shared.enums import AuditActorType, AuditEventType, CaseStatus, DocumentStatus
-from ops_agent.domain.shared.exceptions import ConflictError, PayloadTooLargeError, ResourceNotFoundError, UnsupportedMediaTypeError
+from ops_agent.domain.shared.enums import AuditActorType, CaseStatus, DocumentStatus
+from ops_agent.domain.shared.exceptions import ConflictError, OpsAgentError, ResourceNotFoundError
 from ops_agent.infrastructure.db.models import Document
 from ops_agent.infrastructure.db.repositories.document_repository import DocumentRepository
 from ops_agent.infrastructure.storage.protocols import DocumentStorage
@@ -50,20 +52,75 @@ class DocumentUploadService:
                 error_code="document_upload_not_allowed",
             )
 
-        self._validate_upload(upload)
         content = await upload.read()
-        self._validate_content_size(len(content))
+        try:
+            validated_upload = validate_upload_file(
+                upload=upload,
+                content=content,
+                storage_settings=self._storage_settings,
+            )
+        except OpsAgentError as exc:
+            self._audit_rejected_upload(
+                case_id=case.id,
+                upload=upload,
+                request=request,
+                reason_code=exc.error_code,
+                reason_message=exc.message,
+                content_size_bytes=len(content),
+            )
+            self._repository.commit()
+            raise
 
-        now = datetime.now(UTC)
-        document = Document(
-            id=uuid4(),
+        document = self._create_document_record(
             case_id=case.id,
-            filename=upload.filename or "upload.bin",
+            validated_upload=validated_upload,
+            request=request,
+        )
+
+        document = self._store_and_finalize_upload(
+            case=case,
+            document=document,
+            content=content,
+            request=request,
+            now=document.uploaded_at,
+        )
+
+        return DocumentUploadMetadataResponse(
+            id=document.id,
+            case_id=document.case_id,
+            filename=document.filename,
+            document_type=document.document_type,
+            mime_type=document.mime_type,
+            source_channel=document.source_channel,
+            storage_key=document.storage_key,
+            sha256_digest=document.sha256_digest,
+            file_size_bytes=document.file_size_bytes,
+            uploaded_at=document.uploaded_at,
+            status=document.status,
+            status_changed_at=document.status_changed_at,
+            page_count=document.page_count,
+            metadata=document.document_metadata,
+            created_at=document.created_at,
+            updated_at=document.updated_at,
+        )
+
+    def _create_document_record(
+        self,
+        *,
+        case_id: uuid.UUID,
+        validated_upload: ValidatedUpload,
+        request: DocumentUploadRequest,
+    ) -> Document:
+        now = datetime.now(UTC)
+        return Document(
+            id=uuid4(),
+            case_id=case_id,
+            filename=validated_upload.sanitized_filename,
             document_type=request.document_type,
-            mime_type=upload.content_type or "application/octet-stream",
+            mime_type=validated_upload.mime_type,
             storage_key="pending",
             sha256_digest="pending",
-            file_size_bytes=len(content),
+            file_size_bytes=validated_upload.size_bytes,
             uploaded_at=now,
             status=DocumentStatus.UPLOADED,
             status_changed_at=now,
@@ -74,6 +131,15 @@ class DocumentUploadService:
             updated_by=str(request.uploaded_by_user_id) if request.uploaded_by_user_id else None,
         )
 
+    def _store_and_finalize_upload(
+        self,
+        *,
+        case,
+        document: Document,
+        content: bytes,
+        request: DocumentUploadRequest,
+        now: datetime,
+    ) -> Document:
         stored_document = self._storage.store(
             case_id=case.id,
             document_id=document.id,
@@ -111,40 +177,33 @@ class DocumentUploadService:
             )
         self._repository.commit()
         self._repository.refresh(document)
+        return document
 
-        return DocumentUploadMetadataResponse(
-            id=document.id,
-            case_id=document.case_id,
-            filename=document.filename,
-            document_type=document.document_type,
-            mime_type=document.mime_type,
-            source_channel=document.source_channel,
-            storage_key=document.storage_key,
-            sha256_digest=document.sha256_digest,
-            file_size_bytes=document.file_size_bytes,
-            uploaded_at=document.uploaded_at,
-            status=document.status,
-            status_changed_at=document.status_changed_at,
-            page_count=document.page_count,
-            metadata=document.document_metadata,
-            created_at=document.created_at,
-            updated_at=document.updated_at,
+    def _audit_rejected_upload(
+        self,
+        *,
+        case_id,
+        upload: UploadFile,
+        request: DocumentUploadRequest,
+        reason_code: str,
+        reason_message: str,
+        content_size_bytes: int,
+    ) -> None:
+        now = datetime.now(UTC)
+        self._audit_service.record_document_upload_rejected(
+            case_id=case_id,
+            actor_user_id=request.uploaded_by_user_id,
+            actor_type=AuditActorType.USER if request.uploaded_by_user_id else AuditActorType.SYSTEM,
+            actor_identifier=str(request.uploaded_by_user_id) if request.uploaded_by_user_id else "system",
+            filename=upload.filename,
+            mime_type=upload.content_type,
+            file_size_bytes=content_size_bytes,
+            reason_code=reason_code,
+            reason_message=reason_message,
+            document_type=request.document_type,
+            source_channel=request.source_channel,
+            occurred_at=now,
         )
-
-    def _validate_upload(self, upload: UploadFile) -> None:
-        if not upload.filename:
-            raise ConflictError("Uploaded file must include a filename.", error_code="missing_filename")
-        content_type = upload.content_type or "application/octet-stream"
-        if content_type not in self._storage_settings.allowed_mime_types:
-            raise UnsupportedMediaTypeError(
-                f"File type '{content_type}' is not allowed. Allowed types: {', '.join(self._storage_settings.allowed_mime_types)}."
-            )
-
-    def _validate_content_size(self, size_bytes: int) -> None:
-        if size_bytes > self._storage_settings.max_upload_bytes:
-            raise PayloadTooLargeError(
-                f"Uploaded file exceeds the maximum allowed size of {self._storage_settings.max_upload_bytes} bytes."
-            )
 
 
 def parse_upload_metadata(raw_metadata: str | None) -> dict[str, str]:

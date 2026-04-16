@@ -90,6 +90,7 @@ class AuditActorType(StrEnum):
 class AuditEventType(StrEnum):
     CASE_CREATED = "case_created"
     DOCUMENT_ADDED = "document_added"
+    DOCUMENT_UPLOAD_REJECTED = "document_upload_rejected"
     DOCUMENT_DOWNLOADED = "document_downloaded"
     OCR_COMPLETED = "ocr_completed"
     EXTRACTION_COMPLETED = "extraction_completed"
@@ -106,8 +107,7 @@ class UserStatus(StrEnum):
 
 
 class RoleCode(StrEnum):
-    OPS_REVIEWER = "ops_reviewer"
-    OPS_SUPERVISOR = "ops_supervisor"
-    COMPLIANCE_OFFICER = "compliance_officer"
-    RISK_ANALYST = "risk_analyst"
-    PLATFORM_ADMIN = "platform_admin"
+    OPS_USER = "ops_user"
+    REVIEWER = "reviewer"
+    COMPLIANCE_USER = "compliance_user"
+    ADMIN = "admin"
