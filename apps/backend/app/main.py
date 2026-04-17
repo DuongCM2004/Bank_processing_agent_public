@@ -28,8 +28,33 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    @app.get("/", tags=["system"], include_in_schema=False)
+    def root() -> dict[str, object]:
+        api_base = settings.api_v1_prefix.rstrip("/")
+        return {
+            "name": settings.app_name,
+            "status": "ok",
+            "environment": settings.env,
+            "api_base": api_base,
+            "links": {
+                "health": f"{api_base}/health",
+                "docs": f"{api_base}/docs",
+                "openapi": f"{api_base}/openapi.json",
+            },
+            "features": [
+                "case creation and listing",
+                "case status transitions",
+                "document upload and listing",
+                "processing queue dispatch",
+                "extraction result recording",
+                "decision recording",
+                "manual review action recording",
+                "case audit event listing",
+            ],
+        }
+
     return app
 
 
 app = create_app()
-
