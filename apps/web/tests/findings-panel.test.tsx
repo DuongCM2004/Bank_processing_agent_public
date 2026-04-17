@@ -90,7 +90,7 @@ describe("FindingsPanel", () => {
     expect(screen.getByText("sanctions watchlist")).toBeInTheDocument();
     expect(screen.getByText("kyc document complete")).toBeInTheDocument();
     expect(screen.getByText("Linked field: document number")).toBeInTheDocument();
-    expect(screen.getByText("Linked field: full name")).toBeInTheDocument();
+    expect(screen.getAllByText("Linked field: full name")).toHaveLength(2);
     expect(screen.getAllByText("blocking")).not.toHaveLength(0);
     expect(screen.getByText("Status: resolved | KYC-4.2")).toBeInTheDocument();
   });

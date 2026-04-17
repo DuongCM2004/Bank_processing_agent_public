@@ -6,11 +6,13 @@ import { AsyncContent } from "@/components/ui/AsyncContent";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AuditHistoryPanel } from "@/features/audit/components/AuditHistoryPanel";
 import { CaseStatusBadge } from "@/features/cases/components/CaseStatusBadge";
+import { CaseOperationsPanel } from "@/features/cases/components/CaseOperationsPanel";
 import { CaseSummaryCard } from "@/features/cases/components/CaseSummaryCard";
 import { DecisionSummaryCard } from "@/features/cases/components/DecisionSummaryCard";
 import { ExtractionSummaryCard } from "@/features/cases/components/ExtractionSummaryCard";
 import { ManualReviewStatusCard } from "@/features/cases/components/ManualReviewStatusCard";
 import { useCaseWorkspaceQuery } from "@/features/cases/hooks";
+import { DocumentManagementPanel } from "@/features/documents/components/DocumentManagementPanel";
 import { DocumentViewerShell } from "@/features/documents/components/DocumentViewerShell";
 import { ExtractionReviewPanel } from "@/features/review/components/ExtractionReviewPanel";
 import { FindingsPanel } from "@/features/review/components/FindingsPanel";
@@ -76,6 +78,8 @@ export function CaseDetailPage() {
             />
 
             <CaseSummaryCard caseDetail={workspace.caseDetail} />
+            <DocumentManagementPanel caseId={workspace.caseDetail.id} documents={workspace.caseDetail.documents} />
+            <CaseOperationsPanel caseDetail={workspace.caseDetail} />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
               <div className="space-y-6">

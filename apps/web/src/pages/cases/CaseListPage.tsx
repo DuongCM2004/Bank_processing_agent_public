@@ -4,6 +4,7 @@ import type { CaseStatus } from "@/api/contracts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { AsyncContent } from "@/components/ui/AsyncContent";
+import { CaseCreatePanel } from "@/features/cases/components/CaseCreatePanel";
 import { CaseFilters } from "@/features/cases/components/CaseFilters";
 import { CasePaginationControls } from "@/features/cases/components/CasePaginationControls";
 import { CaseSummaryTable } from "@/features/cases/components/CaseSummaryTable";
@@ -48,6 +49,8 @@ export function CaseListPage() {
         title="Case queue"
         description="Operational case list for triage, review ownership, queue paging, and navigation into the case workspace."
       />
+
+      <CaseCreatePanel />
 
       <Card
         title="All cases"

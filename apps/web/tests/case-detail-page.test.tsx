@@ -7,6 +7,10 @@ import { renderWithProviders } from "./render";
 
 const refetch = vi.fn();
 const useCaseWorkspaceQueryMock = vi.fn();
+const transitionMutateAsync = vi.fn();
+const uploadMutateAsync = vi.fn();
+const queueMutateAsync = vi.fn();
+const decisionMutateAsync = vi.fn();
 const addNoteMutateAsync = vi.fn();
 const submitCorrectionsMutateAsync = vi.fn();
 const resubmitMutateAsync = vi.fn();
@@ -22,6 +26,22 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/features/cases/hooks", () => ({
   useCaseWorkspaceQuery: (...args: unknown[]) => useCaseWorkspaceQueryMock(...args),
+  useTransitionCaseStatusMutation: () => ({
+    mutateAsync: transitionMutateAsync,
+    isPending: false,
+  }),
+  useUploadCaseDocumentMutation: () => ({
+    mutateAsync: uploadMutateAsync,
+    isPending: false,
+  }),
+  useQueueCaseProcessingMutation: () => ({
+    mutateAsync: queueMutateAsync,
+    isPending: false,
+  }),
+  useCreateDecisionMutation: () => ({
+    mutateAsync: decisionMutateAsync,
+    isPending: false,
+  }),
 }));
 
 vi.mock("@/features/review/hooks", () => ({
@@ -43,6 +63,10 @@ describe("CaseDetailPage", () => {
   beforeEach(() => {
     refetch.mockReset();
     useCaseWorkspaceQueryMock.mockReset();
+    transitionMutateAsync.mockReset();
+    uploadMutateAsync.mockReset();
+    queueMutateAsync.mockReset();
+    decisionMutateAsync.mockReset();
     addNoteMutateAsync.mockReset();
     submitCorrectionsMutateAsync.mockReset();
     resubmitMutateAsync.mockReset();
@@ -54,7 +78,10 @@ describe("CaseDetailPage", () => {
 
     expect(useCaseWorkspaceQueryMock).toHaveBeenCalledWith("case-123");
     expect(screen.getByText("Case summary")).toBeInTheDocument();
-    expect(screen.getByText("Documents")).toBeInTheDocument();
+    expect(screen.getByText("Document intake")).toBeInTheDocument();
+    expect(screen.getByText("Stored documents")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload document" })).toBeInTheDocument();
+    expect(screen.getByText("Document viewer")).toBeInTheDocument();
     expect(screen.getByText("Extraction summary")).toBeInTheDocument();
     expect(screen.getByText("Extraction review")).toBeInTheDocument();
     expect(screen.getByText("Validation findings")).toBeInTheDocument();

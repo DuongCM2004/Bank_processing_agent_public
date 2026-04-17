@@ -7,15 +7,21 @@ import { renderWithProviders } from "./render";
 
 const refetch = vi.fn();
 const useCasesQueryMock = vi.fn();
+const createCaseMutateAsync = vi.fn();
 
 vi.mock("@/features/cases/hooks", () => ({
   useCasesQuery: (...args: unknown[]) => useCasesQueryMock(...args),
+  useCreateCaseMutation: () => ({
+    mutateAsync: createCaseMutateAsync,
+    isPending: false,
+  }),
 }));
 
 describe("CaseListPage", () => {
   beforeEach(() => {
     refetch.mockReset();
     useCasesQueryMock.mockReset();
+    createCaseMutateAsync.mockReset();
     useCasesQueryMock.mockReturnValue(
       buildQueryState({
         data: buildCaseListResponse({
