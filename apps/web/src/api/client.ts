@@ -49,6 +49,39 @@ class ApiClient {
     return (await response.json()) as TResponse;
   }
 
+  async patch<TResponse, TBody extends object>(path: string, body: TBody) {
+    const response = await this.request(`${this.baseUrl}${path}`, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      await this.raiseApiError(response);
+    }
+
+    return (await response.json()) as TResponse;
+  }
+
+  async postForm<TResponse>(path: string, body: FormData) {
+    const response = await this.request(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      await this.raiseApiError(response);
+    }
+
+    return (await response.json()) as TResponse;
+  }
+
   private request(input: RequestInfo | URL, init: RequestInit) {
     return fetch(input, init);
   }

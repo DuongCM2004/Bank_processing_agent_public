@@ -27,18 +27,29 @@ export type FindingStatus = "open" | "resolved" | "waived";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type DecisionOutcome = "approved" | "rejected" | "review_required" | "escalated";
 export type DecisionType = "system_recommendation" | "reviewer_decision" | "supervisor_decision";
+export type ManualReviewActionType =
+  | "add_note"
+  | "claim"
+  | "unclaim"
+  | "confirm_extraction"
+  | "correct_data"
+  | "request_reprocessing"
+  | "escalate"
+  | "approve"
+  | "reject"
+  | "close";
 export type AuditActorType = "system" | "user" | "service";
 export type AuditEventType =
   | "case_created"
   | "document_added"
-  | "document_upload_rejected"
-  | "document_downloaded"
   | "ocr_completed"
   | "extraction_completed"
+  | "validation_completed"
   | "finding_created"
   | "decision_recorded"
   | "manual_review_action_recorded"
-  | "status_changed";
+  | "status_changed"
+  | "processing_queued";
 
 export interface EvidenceReference {
   document_id: string;
@@ -179,11 +190,12 @@ export interface ManualReviewAction {
   case_id: string;
   document_id?: string | null;
   performed_by_user_id: string;
+  reviewer_id?: string;
   related_decision_id?: string | null;
-  action_type: string;
+  action_type: ManualReviewActionType;
   comment?: string | null;
   payload: Record<string, unknown>;
-  evidence_refs: EvidenceReference[];
+  evidence_refs: readonly EvidenceReference[];
   created_at: string;
   updated_at: string;
 }
@@ -247,18 +259,23 @@ export interface ManualReviewWorkflowResponse {
 export interface AuditEvent {
   id: string;
   case_id?: string | null;
+  actor_id?: string | null;
   actor_user_id?: string | null;
   actor_type: AuditActorType;
   actor_identifier?: string | null;
   event_type: AuditEventType;
   summary: string;
+  message?: string;
   resource_type: string;
+  entity_type?: string;
   resource_id: string;
+  entity_id?: string | null;
   occurred_at: string;
   metadata: Record<string, unknown>;
+  details?: Record<string, unknown>;
   evidence_refs: EvidenceReference[];
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CaseSummary {
@@ -317,6 +334,60 @@ export interface AuditEventListResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface CaseCreateRequest {
+  case_reference: string;
+  case_type: string;
+  customer_reference?: string | null;
+  source_channel?: string;
+  current_queue?: string;
+  case_metadata?: Record<string, unknown>;
+  actor_id?: string | null;
+}
+
+export interface CaseStatusTransitionRequest {
+  to_status: CaseStatus;
+  actor_type?: AuditActorType;
+  actor_id?: string | null;
+  reason_code?: string | null;
+  comment?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CaseStatusTransitionResponse {
+  case_id: string;
+  from_status: CaseStatus;
+  to_status: CaseStatus;
+  transition_name: string;
+  status_changed_at: string;
+}
+
+export interface QueueProcessingRequest {
+  actor_id?: string | null;
+  reason_code?: string | null;
+}
+
+export interface QueueProcessingResponse {
+  case_id: string;
+  status: CaseStatus;
+}
+
+export interface DecisionCreateRequest {
+  outcome: DecisionOutcome;
+  rationale: string;
+  evidence_refs?: EvidenceReference[];
+  decision_metadata?: Record<string, unknown>;
+  actor_id: string;
+}
+
+export interface ManualReviewActionCreateRequest {
+  document_id?: string | null;
+  action_type: ManualReviewActionType;
+  reviewer_id: string;
+  comment?: string | null;
+  payload?: Record<string, unknown>;
+  evidence_refs?: EvidenceReference[];
 }
 
 export interface ApiErrorDetail {
