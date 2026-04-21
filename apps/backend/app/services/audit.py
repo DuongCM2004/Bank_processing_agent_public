@@ -17,3 +17,9 @@ class AuditService:
             total=total,
         )
 
+    def list_uuid_events(self, entity_uuid: UUID, *, limit: int, offset: int) -> AuditEventListResponse:
+        items, total = self.repository.list_for_uuid(entity_uuid, limit=limit, offset=offset)
+        return AuditEventListResponse(
+            items=[AuditEventResponse.model_validate(item) for item in items],
+            total=total,
+        )
