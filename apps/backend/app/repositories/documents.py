@@ -43,3 +43,19 @@ class ProcessingResultRepository:
         )
         return list(self.db.scalars(stmt))
 
+    def list_extractions_for_document(self, document_id: UUID) -> list[ExtractionResult]:
+        stmt = (
+            select(ExtractionResult)
+            .where(ExtractionResult.document_id == document_id)
+            .order_by(ExtractionResult.created_at.desc())
+        )
+        return list(self.db.scalars(stmt))
+
+    def get_latest_extraction_for_document(self, document_id: UUID) -> ExtractionResult | None:
+        stmt = (
+            select(ExtractionResult)
+            .where(ExtractionResult.document_id == document_id)
+            .order_by(ExtractionResult.created_at.desc())
+            .limit(1)
+        )
+        return self.db.scalar(stmt)
