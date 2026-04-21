@@ -14,6 +14,16 @@ export type CaseStatus =
 export type DocumentStatus =
   | "uploaded"
   | "stored"
+  | "queued"
+  | "preprocessing"
+  | "extracting"
+  | "validating"
+  | "retrying"
+  | "extracted"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "persisted"
   | "ocr_pending"
   | "ocr_completed"
   | "extraction_completed"
@@ -49,7 +59,70 @@ export type AuditEventType =
   | "decision_recorded"
   | "manual_review_action_recorded"
   | "status_changed"
-  | "processing_queued";
+  | "processing_queued"
+  | "document_queued"
+  | "document_review_started"
+  | "document_approved"
+  | "document_rejected"
+  | "document_persisted"
+  | "document_failed";
+
+export interface IdentityDocumentExtraction {
+  document_type: string | null;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  id_number: string | null;
+  document_number: string | null;
+  date_of_birth: string | null;
+  sex: string | null;
+  gender: string | null;
+  nationality: string | null;
+  place_of_birth: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  issuing_authority: string | null;
+  address: string | null;
+  raw_full_text: string | null;
+}
+
+export interface DocumentStatusResponse {
+  document_uuid: string;
+  status: DocumentStatus;
+  extraction_uuid?: string | null;
+  extraction_status?: ProcessingStatus | null;
+  updated_at: string;
+}
+
+export interface DocumentExtractionField {
+  field_name: keyof IdentityDocumentExtraction;
+  extracted_value?: string | null;
+  reviewed_value?: string | null;
+}
+
+export interface DocumentExtractionResponse {
+  document_uuid: string;
+  extraction_uuid?: string | null;
+  status: DocumentStatus;
+  fields: DocumentExtractionField[];
+  extracted_payload: Record<string, unknown>;
+  reviewed_payload?: Record<string, unknown> | null;
+  raw_full_text?: string | null;
+}
+
+export interface DocumentReviewRequest {
+  action: "edit" | "approve" | "reject";
+  reviewer_id: string;
+  reviewed_payload?: IdentityDocumentExtraction | null;
+  comment?: string | null;
+}
+
+export interface DocumentReviewResponse {
+  document_uuid: string;
+  extraction_uuid?: string | null;
+  status: DocumentStatus;
+  action_id: string;
+}
 
 export interface EvidenceReference {
   document_id: string;
