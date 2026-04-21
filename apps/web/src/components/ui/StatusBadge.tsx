@@ -1,11 +1,13 @@
 import { cn } from "@/lib/cn";
 
 interface StatusBadgeProps {
-  tone: "neutral" | "active" | "warning" | "danger" | "success";
+  tone: StatusBadgeTone;
   children: string;
 }
 
-const toneClasses: Record<StatusBadgeProps["tone"], string> = {
+export type StatusBadgeTone = "neutral" | "active" | "warning" | "danger" | "success";
+
+const toneClasses: Record<StatusBadgeTone, string> = {
   neutral: "bg-mist text-ink",
   active: "bg-accentSoft text-accent",
   warning: "bg-warningSoft text-warning",

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { DocumentUploadMetadata } from "@/api/contracts";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { documentStatusTones } from "@/features/documents/status";
 import { cn } from "@/lib/cn";
 
 export interface DocumentViewerEvidenceAnchor {
@@ -26,17 +27,6 @@ export interface DocumentViewerShellProps {
   evidenceAnchors?: DocumentViewerEvidenceAnchor[];
   className?: string;
 }
-
-const tones = {
-  uploaded: "active",
-  stored: "active",
-  ocr_pending: "warning",
-  ocr_completed: "active",
-  extraction_completed: "success",
-  review_required: "warning",
-  failed: "danger",
-  archived: "neutral",
-} as const;
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString();
@@ -138,7 +128,7 @@ export function DocumentViewerShell({
                       <p className="font-semibold text-ink">{document.filename}</p>
                       <p className="mt-1 text-xs text-slate">{document.document_type}</p>
                     </div>
-                    <StatusBadge tone={tones[document.status]}>{document.status}</StatusBadge>
+                    <StatusBadge tone={documentStatusTones[document.status]}>{document.status}</StatusBadge>
                   </div>
                 </button>
               );
