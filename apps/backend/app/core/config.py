@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     ai_provider_mode: str = "placeholder"
     ai_provider_endpoint: str | None = None
     ai_provider_timeout_seconds: int = 30
+    openai_api_key: str | None = None
+    gpt_model: str = "gpt-4.1"
+    openai_store_response: bool = False
+    llm_prompt_version: str = "identity-document-extraction-v1"
+    llm_schema_version: str = "identity-document-v1"
+    image_max_dimension_px: int = 1600
+    image_jpeg_quality: int = 90
 
     storage_backend: str = "local"
     storage_root_path: Path = Path(".runtime/uploads")
