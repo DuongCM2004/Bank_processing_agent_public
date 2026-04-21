@@ -9,6 +9,7 @@ from app.schemas.audit import AuditEventListResponse
 from app.security.rbac import Permission, require_permission
 
 router = APIRouter(prefix="/cases/{case_id}/audit-events", tags=["audit"])
+uuid_router = APIRouter(prefix="/audit", tags=["audit"])
 
 
 @router.get(
@@ -24,3 +25,16 @@ def list_case_audit_events(
 ) -> AuditEventListResponse:
     return service.list_case_events(case_id, limit=limit, offset=offset)
 
+
+@uuid_router.get(
+    "/{entity_uuid}",
+    response_model=AuditEventListResponse,
+    dependencies=[Depends(require_permission(Permission.AUDIT_READ))],
+)
+def list_uuid_audit_events(
+    entity_uuid: UUID,
+    service: AuditServiceDep,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> AuditEventListResponse:
+    return service.list_uuid_events(entity_uuid, limit=limit, offset=offset)
