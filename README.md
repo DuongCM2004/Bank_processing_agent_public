@@ -7,10 +7,15 @@ This repository contains the first implementation slice for the Ops Agent plan:
 - workflow-safe state transitions
 - append-only audit events
 - reviewer task handling
+- production specification for LLM-based document information extraction
 
 ## Current scope
 
 This is not the full platform. The current implementation provides the MVP backend foundation needed to start parallel work across backend, frontend, AI, QA, and security.
+
+The current Documents module target is an inference-only LLM extraction workflow: upload document, store raw file, queue extraction, preprocess with Python/Pillow, call OpenAI GPT-4o or GPT-4o-mini Vision through LangGraph, enforce strict JSON schema, retry once on validation failure, normalize into an editable review table, persist only approved reviewed data, and maintain audit/UUID traceability.
+
+Canonical spec: [docs/production-llm-document-extraction-backend-spec.md](docs/production-llm-document-extraction-backend-spec.md)
 
 ### Included
 
@@ -25,8 +30,8 @@ This is not the full platform. The current implementation provides the MVP backe
 
 ### Not yet included
 
-- OCR integration
-- extraction/classification model adapters
+- GPT-4o Vision extraction adapter
+- LangGraph extraction orchestration
 - persistent relational database
 - object storage
 - authentication middleware
