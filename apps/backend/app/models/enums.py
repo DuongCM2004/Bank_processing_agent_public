@@ -20,6 +20,16 @@ class CaseStatus(StrEnum):
 class DocumentStatus(StrEnum):
     UPLOADED = "uploaded"
     STORED = "stored"
+    QUEUED = "queued"
+    PREPROCESSING = "preprocessing"
+    EXTRACTING = "extracting"
+    VALIDATING = "validating"
+    RETRYING = "retrying"
+    EXTRACTED = "extracted"
+    IN_REVIEW = "in_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PERSISTED = "persisted"
     OCR_PENDING = "ocr_pending"
     OCR_COMPLETED = "ocr_completed"
     EXTRACTION_COMPLETED = "extraction_completed"
@@ -92,6 +102,12 @@ class AuditEventType(StrEnum):
     MANUAL_REVIEW_ACTION_RECORDED = "manual_review_action_recorded"
     STATUS_CHANGED = "status_changed"
     PROCESSING_QUEUED = "processing_queued"
+    DOCUMENT_QUEUED = "document_queued"
+    DOCUMENT_REVIEW_STARTED = "document_review_started"
+    DOCUMENT_APPROVED = "document_approved"
+    DOCUMENT_REJECTED = "document_rejected"
+    DOCUMENT_PERSISTED = "document_persisted"
+    DOCUMENT_FAILED = "document_failed"
 
 
 class UserStatus(StrEnum):
@@ -105,4 +121,3 @@ class RoleCode(StrEnum):
     REVIEWER = "reviewer"
     COMPLIANCE_USER = "compliance_user"
     ADMIN = "admin"
-
