@@ -1,5 +1,25 @@
 # Multi-Agent Workflow Specification for Ops Agent
 
+## Current Architecture Override: LLM Extraction Baseline
+
+The Documents module now follows the production LLM extraction design in [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+For identity-card document extraction, the active architecture is not a model-training pipeline and not a traditional OCR pipeline. It is an inference-only GPT-4o Vision structured extraction workflow:
+
+1. Input documents are images or PDFs.
+2. Python and Pillow validate, resize, normalize, and encode images as base64 data URLs.
+3. LangGraph orchestrates preprocessing, extraction, validation, retry, normalization, and output finalization.
+4. OpenAI GPT-4o or GPT-4o-mini performs OCR-like visual reading and semantic field extraction.
+5. Structured output is enforced with strict Pydantic or JSON Schema rules.
+6. Unknown or uncertain values are `null`.
+7. Extra fields are rejected.
+8. The pipeline retries once when schema validation fails.
+9. Normalized output is displayed as an editable table for manual review.
+10. Only approved reviewed data is persisted to production PostgreSQL tables.
+11. Every document and extraction run is searchable by UUID and fully audit-linked.
+
+Any older references in this document to VietOCR as the primary OCR path, classical ML classification, local LLM fallback, confidence benchmarking, or model-training workflows are legacy architecture notes and are superseded for the Documents extraction module by the baseline above.
+
 ## 1. Workflow Goals
 
 1. Define a conservative multi-agent workflow that supports banking document intake, extraction, validation, compliance gating, decision support, and human review.

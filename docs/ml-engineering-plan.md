@@ -1,5 +1,9 @@
 # ML Engineering Plan for Ops Agent
 
+## Current Documents Module Baseline
+
+The Documents module does not require an ML training plan for identity-document extraction. Use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the active implementation source. Extraction is inference-only using OpenAI GPT-4o or GPT-4o-mini Vision, LangGraph orchestration, Pillow preprocessing, strict Pydantic or JSON Schema validation, one retry, manual review, and approved-only persistence. Any ML engineering content in this document applies only to future optional capabilities outside the current Documents extraction workflow.
+
 ## Role
 
 ML Engineer for a banking-grade Document Processing Agent.

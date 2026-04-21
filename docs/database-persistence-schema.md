@@ -6,15 +6,31 @@ Backend Engineer and Data Architect for a banking-grade Document Processing Agen
 
 ## Objective
 
-Design how the system stores cases, documents, OCR results, extracted fields, validations, decisions, audit logs, and review actions in a way that preserves evidence traceability, supports auditability, and is practical for implementation.
+Design how the system stores documents, extraction runs, extracted fields, reviewed data, audit logs, and review actions in a way that preserves evidence traceability, supports auditability, and is practical for implementation.
+
+## Current Persistence Baseline
+
+The current Documents module persistence design is [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+Production persistence is centered on:
+
+1. `documents`
+2. `extraction_runs`
+3. `extracted_data`
+4. `review_logs`
+5. `audit_events`
+
+The extraction workflow stores raw files and large artifacts in object storage, while PostgreSQL stores UUIDs, lifecycle status, run metadata, extracted payloads, reviewed payloads, and audit events. Unreviewed LLM output is staging data only. Only approved reviewed data is persisted as production business data.
+
+This persistence design does not include dataset, annotation, model-training, benchmark, or model-evaluation tables for the Documents extraction workflow.
 
 ## Assumptions
 
 1. PostgreSQL is the transactional system of record for metadata, workflow state, review actions, and audit history.
 2. S3 / MinIO is the system of record for raw documents and large derived artifacts such as page renders, OCR JSON, layout JSON, prompt/response payloads, and review bundles.
 3. OpenSearch remains a rebuildable read model, not a source of truth.
-4. The current explicit case state machine in the repo must be preserved.
-5. Schema design must support asynchronous workflows, retries, and replay without losing lineage.
+4. The current explicit document extraction state machine must be preserved.
+5. Schema design must support asynchronous extraction, one LLM validation retry, review, approval, and replay without losing lineage.
 
 ## Deliverables
 
@@ -61,7 +77,7 @@ Design how the system stores cases, documents, OCR results, extracted fields, va
 
 1. Add partitioning, archival, legal-hold controls, and cross-region replication.
 2. Add richer external-handoff, entity-linking, and analytical-support tables only after core workflow stability.
-3. Add dataset and annotation schema extensions without changing the operational source-of-truth model.
+3. Keep any future offline research schemas separate from the operational Documents extraction source-of-truth model.
 
 ## 1. Storage Boundary Rules
 
@@ -87,12 +103,11 @@ Store in S3 / MinIO:
 
 1. raw uploaded files
 2. rendered page images
-3. OCR block JSON
-4. layout JSON
-5. extraction bundle JSON
-6. prompt / response payloads
-7. review bundles
-8. audit exports and benchmark exports
+3. preprocessed image artifacts
+4. raw LLM request / response payloads
+5. normalized extraction bundle JSON
+6. review bundles
+7. audit exports
 
 ### 1.3 Design rule
 
@@ -640,29 +655,17 @@ Any final recommendation or reviewer-visible machine output must be reproducible
 
 ### 13.1 Required MVP tables
 
-1. `ops_core.cases`
-2. `ops_core.case_status_history`
-3. `ops_core.documents`
-4. `ops_core.document_versions`
-5. `ops_core.workflow_runs`
-6. `ops_core.workflow_step_runs`
-7. `ops_core.outbox_events`
-8. `ops_ai.artifacts`
-9. `ops_ai.extraction_runs`
-10. `ops_ai.extracted_fields`
-11. `ops_ai.field_evidence_refs`
-12. `ops_rules.validation_runs`
-13. `ops_rules.validation_results`
-14. `ops_rules.decision_runs`
-15. `ops_review.review_tasks`
-16. `ops_review.review_actions`
-17. `ops_audit.audit_events`
+1. `documents`
+2. `extraction_runs`
+3. `extracted_data`
+4. `review_logs`
+5. `audit_events`
 
 ### 13.2 MVP simplifications
 
-1. OCR blocks, layout blocks, and full prompt payloads stay in object storage with artifact registry rows, not decomposed relational tables.
-2. `decision_inputs` and separate validation-evidence tables are optional in MVP if rationale and refs are captured in run payload JSON and artifacts.
-3. OpenSearch projections are generated from these source tables but are not authoritative.
+1. Raw files, preprocessed pages, and raw LLM responses stay in object storage, not in PostgreSQL blobs.
+2. `extracted_data.extracted_payload` is machine staging output; `reviewed_payload` is the human-approved candidate for production persistence.
+3. UUID search projections may be generated from these source tables but are not authoritative.
 
 ## 14. Scale-Stage Schema Extensions
 
@@ -674,20 +677,15 @@ Any final recommendation or reviewer-visible machine output must be reproducible
    for retention hold management
 3. `ops_review.review_comments`
    if threaded review discussion becomes necessary
-4. `ops_rules.compliance_control_results`
-   fully normalized control-by-control status table
+4. tenant-specific production target tables for approved reviewed data
 
 ### 14.2 AI and analytics extensions
 
-1. `ops_ai.ocr_runs`
-   normalized OCR run summary table
-2. `ops_ai.classification_runs`
-   normalized classification run table
-3. `ops_ai.prompt_invocations`
-   structured prompt execution metadata
-4. `ops_ml.datasets`, `ops_ml.dataset_items`, `ops_ml.annotations`
-   for governed training and benchmark support
-5. `ops_audit.lineage_edges`
+1. `prompt_invocations`
+   structured prompt execution metadata when raw response artifact metadata needs query support
+2. `document_pages`
+   normalized page-level status and artifact refs for multi-page PDFs
+3. `audit_lineage_edges`
    explicit lineage graph support
 
 ### 14.3 Scale-stage performance extensions

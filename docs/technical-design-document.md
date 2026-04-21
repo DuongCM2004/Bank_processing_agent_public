@@ -13,7 +13,27 @@ Provide one implementation-ready technical design document that consolidates pro
 1. The system handles sensitive identity, financial, and compliance-relevant banking documents.
 2. The first release is a controlled MVP with conservative automation boundaries and mandatory human review for all KYC approvals and high-risk cases.
 3. Existing design artifacts in `docs/` remain the detailed source documents; this TDD is the implementation kickoff document and cross-reference hub.
-4. The target stack is Python/FastAPI, event-driven orchestration, VietOCR-based OCR, PostgreSQL, S3-compatible storage, React/Next.js review UI, and audited banking controls.
+4. The target stack is Python/FastAPI, LangGraph extraction orchestration, OpenAI GPT-4o or GPT-4o-mini Vision structured extraction, PostgreSQL, object storage, React/Next.js review UI, and audited banking controls.
+5. The document extraction pipeline is inference-only. It does not include dataset preparation, model training, model testing, benchmarking, or model evaluation workstreams.
+
+## Current Extraction Baseline
+
+The canonical Documents module design is [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md). That document supersedes older OCR-model or ML-training language in this documentation set.
+
+Production extraction is implemented as:
+
+1. upload document image or PDF,
+2. store the raw file in object storage,
+3. queue asynchronous extraction,
+4. preprocess the image with Python and Pillow,
+5. encode the image as base64 data URL,
+6. call OpenAI GPT-4o or GPT-4o-mini Vision for OCR-like visual reading and semantic JSON extraction,
+7. enforce a strict Pydantic or JSON Schema contract,
+8. retry once on schema validation failure,
+9. normalize into an editable table,
+10. require manual review,
+11. persist only approved reviewed data,
+12. write an audit trail and expose UUID search.
 
 ## Deliverables
 
@@ -52,17 +72,19 @@ Provide one implementation-ready technical design document that consolidates pro
 
 ## 1. Executive Summary
 
-Ops Agent is a banking operations platform for controlled document intake, OCR, classification, extraction, validation, review, compliance gating, and audited decision support. The design is intentionally conservative: deterministic rules and workflow state control govern regulated outcomes, AI components assist bounded subproblems, and human review remains mandatory for sensitive decisions.
+Ops Agent is a banking operations platform for controlled document intake, LLM-based structured extraction, validation, manual review, persistence, and audited decision support. The design is intentionally conservative: workflow state control governs regulated outcomes, GPT-4o Vision is used only for bounded structured extraction, and human review remains mandatory before extracted data becomes authoritative.
 
 The MVP focuses on one safe end-to-end path:
 
 1. receive documents,
 2. register evidence,
-3. run OCR and structured extraction,
-4. validate business and compliance requirements,
-5. route uncertain or sensitive cases to human review,
-6. persist full audit and evidence linkage,
-7. expose case and review flows through an operations dashboard.
+3. preprocess document images,
+4. run GPT-4o Vision structured extraction with strict JSON schema enforcement,
+5. validate and retry once when schema validation fails,
+6. route extracted fields to manual review,
+7. persist only approved reviewed data,
+8. preserve audit and UUID traceability,
+9. expose document review flows through an operations dashboard.
 
 This document is the implementation kickoff reference. It summarizes the target design and points teams to the detailed specifications for schemas, prompts, APIs, QA, and controls.
 
@@ -72,13 +94,13 @@ This document is the implementation kickoff reference. It summarizes the target 
 
 1. Case intake and document registration
 2. Document storage and metadata registration
-3. OCR using VietOCR with OpenCV preprocessing
-4. Document classification and field extraction
-5. Validation and cross-document consistency checks
-6. Compliance state tracking and escalation triggers
-7. Decision support with conservative automation boundaries
-8. Human review workstation for correction, escalation, and closeout
-9. Audit logging, evidence traceability, observability, and rollback-ready operations
+3. image/PDF preprocessing with Python and Pillow
+4. Vision LLM extraction using OpenAI GPT-4o or GPT-4o-mini
+5. strict schema validation and one bounded retry
+6. normalization into editable table format
+7. manual review with edit, approve, and reject actions
+8. approved-only persistence into production tables
+9. audit logging, UUID search, evidence traceability, observability, and rollback-ready operations
 
 ### Out of scope for MVP
 
@@ -86,7 +108,7 @@ This document is the implementation kickoff reference. It summarizes the target 
 2. Full autonomous KYC approval
 3. Autonomous sanctions, AML, fraud, or rejection decisions
 4. Multi-region active-active topology
-5. Large-scale model retraining automation and broad experimentation framework
+5. Any dataset preparation, model training, model testing, benchmarking, or evaluation workflow for extraction
 
 For product scope and acceptance detail, see [ops-agent-prd.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\ops-agent-prd.md).
 
@@ -124,17 +146,17 @@ FastAPI Control Plane
         +---------------------+
         |                     |
         v                     v
-Temporal                Kafka / Redis + Celery
-- orchestration         - async jobs
-- timers                - OCR / extraction / validation tasks
-- retries
+LangGraph               Redis / Celery or background workers
+- extraction graph      - async jobs
+- validation routing    - preprocessing / extraction / review tasks
+- one retry
         |
         +--------------------------------------------------+
         |              |              |                    |
         v              v              v                    v
-OCR service      classification   validation         compliance / decision
-- OpenCV         extraction       rules engine       policy gates
-- VietOCR        confidence       cross-doc checks   escalation routing
+Preprocessing    LLM extraction   validation         review / persistence
+- Pillow         GPT-4o Vision    Pydantic/JSON     approval gates
+- base64 image   strict JSON      schema checks     audit routing
         |
         +-------------------+--------------------------+
                             |                          |
@@ -155,7 +177,7 @@ OCR service      classification   validation         compliance / decision
 2. Use PostgreSQL as the system of record for workflow state, decisions, review actions, and audit metadata.
 3. Use S3/MinIO for raw and derived evidence artifacts.
 4. Use OpenSearch as a read-optimized operational index only, not the source of truth.
-5. Use Temporal for durable workflow orchestration and Celery/Kafka for bounded async compute.
+5. Use LangGraph for extraction orchestration and Celery, Redis Queue, or background workers for bounded async execution.
 
 For the full architecture and service boundaries, see [solution-architecture-blueprint.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\solution-architecture-blueprint.md).
 
@@ -165,41 +187,42 @@ For the full architecture and service boundaries, see [solution-architecture-blu
 
 The MVP workflow uses the following bounded agents or service-aligned reasoning steps:
 
-1. Ingestion Agent
-2. OCR Agent
-3. Layout Parsing Agent
-4. Classification Agent
-5. Extraction Agent
-6. Validation Agent
-7. Compliance Agent
-8. Decision Agent
-9. Audit Agent
-10. Human Review Agent
+1. Document Upload Service
+2. Preprocessing Service
+3. LangGraph Extraction Orchestrator
+4. LLM Adapter
+5. Validation Layer
+6. Retry Handler
+7. Normalization Layer
+8. Manual Review Service
+9. Persistence Layer
+10. Audit Trail Service
+11. UUID Search Service
 
 ### 5.2 Workflow sequence
 
 1. Ingestion registers case and documents.
-2. OCR preprocesses and extracts text and layout artifacts.
-3. Classification determines document type or routes to review when uncertain.
-4. Extraction produces field-level values with confidence and evidence references.
-5. Validation applies deterministic rules and cross-document checks.
-6. Compliance evaluates required control status and escalation conditions.
-7. Decision selects auto-progress, review-required, escalate, fail, or close-ready status based on policy.
-8. Human review corrects or escalates where required.
-9. Audit captures every material action with version references.
+2. Preprocessing validates and encodes document images.
+3. LangGraph calls GPT-4o Vision for strict JSON extraction.
+4. Validation enforces the identity-document schema.
+5. Retry runs once when schema validation fails.
+6. Normalization flattens structured JSON into table rows.
+7. Human review edits, approves, or rejects the extracted data.
+8. Persistence writes only approved reviewed data.
+9. Audit captures every material action with UUID and version references.
 
 ### 5.3 AI decision framework
 
 1. Use rules for schema validation, required fields, freshness, thresholds, and hard gating.
-2. Use classical ML for classification, anomaly support, and confidence support where behavior is measurable and stable.
-3. Use LLM-based reasoning only for bounded ambiguous interpretation or reviewer-assist tasks where deterministic methods are insufficient and outputs remain structured and evidence-backed.
+2. Use GPT-4o Vision as the primary bounded extraction engine for identity-document OCR-like reading and semantic field extraction.
+3. Do not use LLM output for final approval, rejection, or compliance disposition.
 
-### 5.4 Confidence and fallback
+### 5.4 Validation and fallback
 
-1. High confidence does not bypass policy gates.
-2. Medium confidence triggers cross-checks or review-required routing.
-3. Low confidence routes to human review.
-4. Failed OCR, conflicting fields, missing mandatory evidence, or model disagreement never produce silent final decisions.
+1. Schema-valid output does not bypass manual review.
+2. Missing or uncertain values remain `null`.
+3. Invalid structured output triggers one retry with a stricter prompt.
+4. Failed preprocessing, schema mismatch, invalid JSON, or repeated validation failure never produce silent final decisions.
 
 For agent boundaries, contracts, routing logic, and safe degradation, see [ai-architecture.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\ai-architecture.md) and [prompt-system.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\prompt-system.md).
 
@@ -212,13 +235,13 @@ The backend is organized around explicit service responsibilities:
 1. `case-service`
    owns case creation, state retrieval, and document registration metadata.
 2. `workflow-service`
-   owns Temporal workflow orchestration and workflow-visible state transitions.
+   owns async job dispatch and workflow-visible document status transitions.
 3. `review-service`
    owns review tasks, field corrections, escalations, revalidation requests, and close actions.
 4. `audit-service`
    owns append-only audit event creation and retrieval.
-5. `ai-worker-services`
-   perform OCR, classification, extraction, and related compute steps without directly mutating workflow state.
+5. `document-extraction-workers`
+   perform preprocessing, GPT-4o Vision extraction, schema validation, retry, and normalization without directly mutating approved business data.
 
 ### 6.2 Core backend rules
 
@@ -231,7 +254,7 @@ The backend is organized around explicit service responsibilities:
 
 The current state model includes:
 
-`received`, `stored`, `queued`, `processing`, `validated`, `review_required`, `in_review`, `corrected`, `approved`, `rejected`, `escalated`, `failed`, `closed`
+`uploaded`, `queued`, `preprocessing`, `extracting`, `validating`, `retrying`, `extracted`, `in_review`, `approved`, `rejected`, `persisted`, `failed`
 
 Compliance state is tracked separately from workflow state to prevent false flattening of pending or partial compliance into completed workflows.
 
@@ -246,28 +269,22 @@ The primary relational entities are:
 1. `cases`
 2. `documents`
 3. `document_pages`
-4. `ocr_runs`
-5. `classification_results`
-6. `extraction_results`
-7. `validation_results`
-8. `compliance_results`
-9. `decision_results`
-10. `review_tasks`
-11. `field_corrections`
-12. `escalations`
-13. `audit_events`
+4. `extraction_runs`
+5. `extracted_data`
+6. `review_logs`
+7. `audit_events`
 
 ### 7.2 Storage boundaries
 
 1. PostgreSQL stores workflow state, review actions, decision metadata, result metadata, and audit metadata.
-2. S3/MinIO stores raw files, rendered previews, OCR artifacts, model outputs, and evidence attachments.
+2. Object storage stores raw files, rendered previews, preprocessed images, raw LLM responses, normalized payloads, and evidence attachments.
 3. OpenSearch stores derived read models and search indexes.
 
 ### 7.3 Data design requirements
 
 1. Every derived output must link back to its source document or page.
-2. Every critical result must include version metadata for rules, models, and prompts where applicable.
-3. Evidence linkage must survive retries, revalidation, correction, and review cycles.
+2. Every extraction run must include model name, prompt version, schema version, attempt count, raw LLM artifact URI, and validation errors where applicable.
+3. Evidence and audit linkage must survive retries, correction, review, approval, rejection, and production persistence.
 
 For schemas and persistence detail, see [database-persistence-schema.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\database-persistence-schema.md) and [shared-data-contracts.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\shared-data-contracts.md).
 
@@ -283,18 +300,11 @@ For schemas and persistence detail, see [database-persistence-schema.md](D:\Self
 
 ### 8.2 Core MVP endpoints
 
-1. `POST /v1/cases`
-2. `GET /v1/cases/{case_id}`
-3. `POST /v1/cases/{case_id}/documents`
-4. `GET /v1/cases/{case_id}/documents/{document_id}`
-5. `GET /v1/cases/{case_id}/results`
-6. `GET /v1/review-tasks`
-7. `POST /v1/review-tasks/{task_id}/claim`
-8. `POST /v1/cases/{case_id}/field-corrections`
-9. `POST /v1/cases/{case_id}/escalations`
-10. `POST /v1/cases/{case_id}/revalidate`
-11. `POST /v1/cases/{case_id}/close`
-12. `GET /v1/cases/{case_id}/audit-events`
+1. `POST /documents/upload`
+2. `GET /documents/{uuid}/status`
+3. `GET /documents/{uuid}/extraction`
+4. `POST /documents/{uuid}/review`
+5. `GET /audit/{uuid}`
 
 ### 8.3 Contract requirements
 
@@ -369,7 +379,7 @@ The QA approach is layered:
 
 1. unit tests for rules, validators, and state transitions,
 2. contract tests for APIs and agent payloads,
-3. component tests for OCR, extraction, validation, and decision behavior,
+3. component tests for preprocessing, extraction, validation, and review behavior,
 4. integration tests for workflow, storage, queueing, and audit,
 5. end-to-end tests for operational journeys,
 6. regression packs for models, prompts, rules, APIs, and UI,
@@ -419,11 +429,12 @@ The MVP implements:
 
 1. case intake and document registration,
 2. support for the defined MVP document types,
-3. VietOCR-based OCR pipeline,
-4. classification, extraction, validation, and conservative routing,
-5. review task creation and reviewer workstation,
-6. correction, escalation, revalidation, and audited closeout,
-7. security baseline, observability baseline, and release gating.
+3. Pillow-based preprocessing and base64 image transport,
+4. GPT-4o Vision structured JSON extraction,
+5. strict schema validation and one retry,
+6. review task creation and editable extraction table,
+7. approved-only persistence,
+8. security baseline, observability baseline, audit trail, and UUID search.
 
 The MVP does not implement broad autonomous decisioning or large-scale automation expansion.
 
@@ -459,7 +470,7 @@ The scale path must preserve the MVP control model:
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Contract churn across backend, AI, and UI | rework and integration delays | freeze shared schemas and enums before broad implementation |
-| AI confidence instability | unsafe routing or reviewer overload | use benchmark packs, conservative thresholds, and review-required defaults |
+| LLM schema or hallucination risk | invalid or unsupported extracted fields | use strict JSON schema, null-for-unknown prompting, one retry, manual review, and approved-only persistence |
 | Audit gaps discovered late | release block and compliance risk | implement audit as core infrastructure, not release polish |
 | Review UX lags backend completion | no safe operational path | keep review workstation on the MVP critical path |
 | Security hardening deferred | launch blocker | include auth, upload security, secret handling, and log protection in early sprints |

@@ -1,5 +1,9 @@
 # QA Engineering Test Strategy for Ops Agent
 
+## Current Documents Module Baseline
+
+QA for the Documents extraction module validates backend behavior defined in [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md): upload, storage, status transitions, preprocessing errors, strict schema validation, one retry, normalization, manual review actions, approved-only persistence, audit events, UUID search, permissions, and observability. QA must not frame the current extraction workflow as dataset preparation, OCR model training, benchmarking, or model evaluation.
+
 ## Role
 
 QA Engineer for a banking-grade Document Processing Agent.

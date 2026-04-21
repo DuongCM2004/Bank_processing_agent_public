@@ -1,5 +1,9 @@
 # DevOps and MLOps Blueprint for Ops Agent
 
+## Current Documents Module Baseline
+
+For the Documents extraction workflow, deployment and operations target an inference-only backend, not an ML training platform. Use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the active implementation source. Operational concerns are FastAPI service deployment, worker queues, LangGraph runtime, OpenAI credential management, object storage, PostgreSQL, audit logging, observability, and UUID search. Dataset preparation, model training, benchmarking, and evaluation pipelines are not part of the current Documents extraction release.
+
 ## Role
 
 DevOps / MLOps Engineer for a banking-grade Document Processing Agent.

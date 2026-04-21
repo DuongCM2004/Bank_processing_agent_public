@@ -8,13 +8,27 @@ Senior Backend Engineer and API Architect for a banking-grade Document Processin
 
 Define the APIs needed for document ingestion, workflow orchestration, review support, result retrieval, and audit access in a form that is practical for implementation and aligned with the repo's current FastAPI workflow model.
 
+## Current API Baseline
+
+The current Documents module API is defined by [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+The production extraction API is document-UUID centric:
+
+1. `POST /documents/upload`
+2. `GET /documents/{uuid}/status`
+3. `GET /documents/{uuid}/extraction`
+4. `POST /documents/{uuid}/review`
+5. `GET /audit/{uuid}`
+
+The extraction API returns asynchronous status and review-ready structured data. It does not expose dataset, training, testing, benchmarking, or model-evaluation resources.
+
 ## Assumptions
 
-1. The current MVP backend already supports case creation, document registration, review tasks, corrections, escalations, revalidation, closure, and audit-event retrieval.
+1. The current MVP backend must support document upload, extraction status retrieval, extraction result retrieval, manual review submission, and audit-event retrieval.
 2. PostgreSQL will become the system of record for production, but the current API contract should remain stable while persistence evolves.
 3. Asynchronous processing is workflow-driven and must expose visible state rather than hiding work behind synchronous request latency.
 4. The API must support both human-review UI needs and internal workflow orchestration.
-5. High-risk routing, approval, rejection, and escalation must remain workflow-safe and auditable.
+5. Review edit, approval, and rejection must remain workflow-safe and auditable.
 
 ## Deliverables
 
@@ -104,7 +118,7 @@ Define the APIs needed for document ingestion, workflow orchestration, review su
 
 | Resource | Purpose | Primary key |
 |---|---|---|
-| Workflow Run | Temporal-backed execution state for a case | `workflow_run_id` |
+| Extraction Run | LangGraph-backed execution state for one document extraction | `extraction_uuid` |
 | Job Submission | one compute or rules-processing request | `job_id` |
 | Compliance Evaluation | control-status evaluation result | `evaluation_id` |
 | Decision Evaluation | route-selection computation result | `decision_id` |
@@ -148,44 +162,31 @@ Public APIs return resource objects directly for simple retrieval and creation. 
 | `GET` | `/ready` | readiness probe for dependencies | future |
 | `GET` | `/metrics` | Prometheus metrics | future internal |
 
-### 5.2 Case endpoints
+### 5.2 Document endpoints
 
 | Method | Path | Purpose | MVP |
 |---|---|---|---|
-| `POST` | `/v1/cases` | create a case and register optional initial document bundle | yes |
-| `GET` | `/v1/cases/{case_id}` | fetch case metadata and workflow state | yes |
-| `GET` | `/v1/cases/{case_id}/results` | fetch extracted fields, validations, and route recommendation | yes |
-| `GET` | `/v1/cases/{case_id}/status` | lightweight workflow status view | future |
-| `GET` | `/v1/cases` | filtered case search/list | future |
+| `POST` | `/documents/upload` | upload document, store raw file, create UUIDs, queue extraction | yes |
+| `GET` | `/documents/{uuid}/status` | fetch document and latest extraction status | yes |
+| `GET` | `/documents/{uuid}/extraction` | fetch extracted and reviewed fields for table UI | yes |
+| `POST` | `/documents/{uuid}/review` | submit reviewer edit, approval, or rejection | yes |
+| `GET` | `/documents` | filtered document search/list by UUID/status | future |
+| `GET` | `/documents/{uuid}/artifact-link` | fetch signed artifact URL or artifact metadata | future |
 
-### 5.3 Document endpoints
-
-| Method | Path | Purpose | MVP |
-|---|---|---|---|
-| `POST` | `/v1/cases/{case_id}/documents` | attach additional document to open case | yes |
-| `GET` | `/v1/cases/{case_id}/documents/{document_id}` | fetch document metadata | yes |
-| `GET` | `/v1/cases/{case_id}/documents` | list documents under case | future |
-| `GET` | `/v1/cases/{case_id}/documents/{document_id}/artifact-link` | fetch signed artifact URL or artifact metadata | future |
-
-### 5.4 Review endpoints
+### 5.3 Review endpoints
 
 | Method | Path | Purpose | MVP |
 |---|---|---|---|
-| `GET` | `/v1/review-tasks` | list review tasks by status and queue | yes |
-| `GET` | `/v1/review-tasks/{task_id}` | fetch one review task with case linkage | future |
-| `POST` | `/v1/review-tasks/{task_id}/claim` | claim a task | yes |
-| `POST` | `/v1/cases/{case_id}/field-corrections` | submit reviewer corrections | yes |
-| `POST` | `/v1/cases/{case_id}/escalations` | escalate case to specialist queue | yes |
-| `POST` | `/v1/cases/{case_id}/revalidate` | trigger downstream revalidation | yes |
-| `POST` | `/v1/cases/{case_id}/close` | close case with final outcome | yes |
+| `POST` | `/documents/{uuid}/review` | edit, approve, or reject reviewed extraction payload | yes |
+| `GET` | `/documents/{uuid}/extraction` | retrieve review table state | yes |
+| `GET` | `/review/tasks` | list document review tasks by status and queue | future |
 
-### 5.5 Audit endpoints
+### 5.4 Audit endpoints
 
 | Method | Path | Purpose | MVP |
 |---|---|---|---|
-| `GET` | `/v1/cases/{case_id}/audit-events` | fetch immutable audit events for case | yes |
-| `GET` | `/v1/cases/{case_id}/review-actions` | fetch structured manual-review action history | future |
-| `GET` | `/v1/audit-events/{event_id}` | fetch one audit event | future |
+| `GET` | `/audit/{uuid}` | fetch audit events by document UUID or extraction UUID | yes |
+| `GET` | `/audit/events/{event_id}` | fetch one audit event | future |
 
 ## 6. Public Request and Response Shapes
 
@@ -669,7 +670,7 @@ Design rules:
 ### 8.2 Internal async pattern
 
 1. Ingestion emits workflow-start events.
-2. Workflow service starts Temporal case workflow.
+2. Workflow service starts the LangGraph-backed extraction run.
 3. Worker jobs are submitted with stable job identity and version refs.
 4. Completion of internal jobs updates durable state before route changes are exposed publicly.
 
@@ -820,31 +821,21 @@ Minimal internal job contract:
 ### Public MVP endpoints
 
 1. `GET /health`
-2. `POST /v1/cases`
-3. `GET /v1/cases/{case_id}`
-4. `POST /v1/cases/{case_id}/documents`
-5. `GET /v1/cases/{case_id}/documents/{document_id}`
-6. `GET /v1/cases/{case_id}/results`
-7. `GET /v1/review-tasks`
-8. `POST /v1/review-tasks/{task_id}/claim`
-9. `POST /v1/cases/{case_id}/field-corrections`
-10. `POST /v1/cases/{case_id}/escalations`
-11. `POST /v1/cases/{case_id}/revalidate`
-12. `POST /v1/cases/{case_id}/close`
-13. `GET /v1/cases/{case_id}/audit-events`
+2. `POST /documents/upload`
+3. `GET /documents/{uuid}/status`
+4. `GET /documents/{uuid}/extraction`
+5. `POST /documents/{uuid}/review`
+6. `GET /audit/{uuid}`
 
 ### Internal MVP endpoints
 
 1. `/internal/workflows/start`
-2. `/internal/workflows/{case_id}/signal-review-complete`
-3. `/internal/workflows/{case_id}`
-4. `/internal/ocr/jobs`
-5. `/internal/layout/jobs`
-6. `/internal/classification/jobs`
-7. `/internal/extraction/jobs`
-8. `/internal/validation/jobs`
-9. `/internal/compliance/evaluate`
-10. `/internal/decision/evaluate`
+2. `/internal/documents/{document_uuid}/extract`
+3. `/internal/extractions/{extraction_uuid}/status`
+4. `/internal/preprocessing/jobs`
+5. `/internal/extraction/jobs`
+6. `/internal/validation/jobs`
+7. `/internal/normalization/jobs`
 
 ## 15. Future Endpoints for Scale
 

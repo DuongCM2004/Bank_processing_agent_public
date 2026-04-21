@@ -1,84 +1,70 @@
 # Workflow Orchestration Implementation Specification
 
-This specification defines the explicit orchestration behavior for the banking Document Processing Agent (Ops Agent). It is aligned to the current scaffold in [state_machine.py](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/src/ops_agent/state_machine.py), [case_workflow.py](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/src/ops_agent/workflows/case_workflow.py), [policy.py](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/src/ops_agent/workflows/policy.py), and [workflow_contracts.py](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/src/ops_agent/workflow_contracts.py).
+This specification defines the explicit orchestration behavior for the banking Documents module. The active extraction workflow is the LangGraph-based LLM inference pipeline defined in [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
 
 ## Assumptions
 
-- The workflow engine target is Temporal.
-- PostgreSQL remains the durable source of truth for workflow state and review state.
-- Object storage contains documents and large derived artifacts.
-- No workflow step is allowed to silently approve, reject, or close a case.
+- The extraction orchestrator target is LangGraph.
+- PostgreSQL remains the durable source of truth for document state, extraction state, review state, and audit events.
+- Object storage contains raw documents, preprocessed images, raw LLM responses, and normalized artifacts.
+- No workflow step is allowed to silently approve, reject, or persist unreviewed extraction data.
 - All material workflow events must create durable audit records.
 
 ## 1. Workflow Stages
 
 The canonical MVP workflow stages are:
 
-1. intake registration
-2. document storage confirmation
+1. upload registration
+2. raw file storage confirmation
 3. queue dispatch
-4. OCR
-5. layout analysis
-6. document classification
-7. field extraction
-8. validation and compliance evaluation
-9. routing decision
-10. manual review gate
-11. reviewer correction or escalation
-12. revalidation
-13. outcome recording and closure
+4. preprocessing
+5. GPT-4o Vision structured extraction
+6. strict schema validation
+7. one retry if validation fails
+8. normalization into table rows
+9. manual review gate
+10. reviewer edit, approve, or reject
+11. approved-only persistence
+12. audit and UUID search finalization
 
 Stage ownership for implementation:
 
 | Stage | Primary owner | Output |
 |---|---|---|
 | intake registration | API + workflow starter | case row, document rows, workflow start command |
-| OCR | OCR activity worker | OCR artifact, OCR run/result rows |
-| layout analysis | parser/layout worker | parsing artifact, page structure |
-| document classification | classifier worker | classification result |
-| field extraction | extractor worker | extraction result, evidence refs |
-| validation and compliance evaluation | rules worker | validation findings, risk/compliance findings |
-| routing decision | policy/decision worker | recommended route, reason codes |
-| manual review gate | workflow + review service | review task or direct next state |
-| reviewer correction or escalation | reviewer UI + review service | manual review action, corrected fields |
-| revalidation | rules worker | updated validation set |
-| outcome recording and closure | review service + workflow | approved, rejected, escalated, or closed case |
+| preprocessing | extraction worker | preprocessed image artifact and data URL |
+| GPT-4o Vision extraction | LLM adapter | raw LLM response and parsed prediction |
+| schema validation | validation node | `is_valid`, validation errors |
+| retry | retry node | second prediction attempt when needed |
+| normalization | normalization node | table-ready extracted fields |
+| manual review gate | review service | editable table, review status |
+| reviewer action | reviewer UI + review service | edit, approve, or reject action |
+| approved persistence | persistence service | production relational write |
+| audit and search finalization | audit and UUID search services | lifecycle trace |
 
 ## 2. State Machine Transitions
 
-The orchestration layer must use the explicit case state machine in [state_machine.py](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/src/ops_agent/state_machine.py). Allowed transitions are:
+The orchestration layer must use the explicit document extraction state machine. Allowed transitions are:
 
-- `received -> stored`
-- `stored -> queued`
-- `queued -> processing`
-- `queued -> review_required`
-- `processing -> validated`
-- `processing -> failed`
-- `processing -> review_required`
-- `validated -> review_required`
-- `validated -> approved`
-- `validated -> rejected`
-- `review_required -> in_review`
-- `review_required -> escalated`
-- `in_review -> corrected`
-- `in_review -> escalated`
+- `uploaded -> queued`
+- `queued -> preprocessing`
+- `preprocessing -> extracting`
+- `extracting -> validating`
+- `validating -> extracted`
+- `validating -> retrying`
+- `retrying -> validating`
+- `validating -> failed`
+- `extracted -> in_review`
 - `in_review -> approved`
 - `in_review -> rejected`
-- `corrected -> validated`
-- `corrected -> review_required`
-- `escalated -> in_review`
-- `escalated -> closed`
-- `approved -> closed`
-- `rejected -> closed`
-- `failed -> review_required`
-- `failed -> closed`
+- `approved -> persisted`
 
 Rules:
 
 - Every transition must be driven by a named command.
 - Transition intent must be persisted before external side effects are considered complete.
 - No background worker may mutate case status directly without passing through the state machine guard.
-- Manual review does not bypass `validated`, `approved`, or `rejected`; it only changes how the case reaches them.
+- Manual review does not bypass `approved`, `rejected`, or `persisted`; it is the only path that can make extracted data authoritative.
 
 ## 3. Async Job Boundaries
 
@@ -86,19 +72,16 @@ Each async boundary must be a durable workflow activity or workflow signal bound
 
 MVP boundaries:
 
-- API request ends after case creation and workflow start request persistence.
-- Workflow starter consumes the durable start command and creates a workflow run.
-- OCR is its own activity boundary.
-- Layout analysis is its own activity boundary.
-- Classification is its own activity boundary.
-- Extraction is its own activity boundary.
-- Validation and compliance evaluation are their own activity boundary.
-- Decision routing is its own activity boundary.
-- Review wait state is a workflow pause boundary.
-- Reviewer completion is a workflow signal boundary.
-- Revalidation after correction is a new validation activity boundary.
+- API request ends after raw file storage, document record creation, extraction run creation, and queue dispatch.
+- Preprocessing is its own worker boundary.
+- GPT-4o Vision extraction is its own worker boundary.
+- Schema validation is its own LangGraph node boundary.
+- Retry is its own LangGraph node boundary and is limited to one retry.
+- Normalization is its own node boundary.
+- Review wait state is represented by `in_review`.
+- Reviewer approval is the only path to production persistence.
 
-Do not combine OCR, extraction, and validation into one opaque worker job. Those steps need independent retry, timeout, evidence, and audit behavior.
+Do not combine preprocessing, LLM extraction, validation, retry, normalization, and review into one opaque job. Those steps need independent status, timeout, artifact, and audit behavior.
 
 ## 4. Queue And Job Responsibilities
 
@@ -338,7 +321,7 @@ Recommended MVP implementation:
 
 1. API persists case, documents, and workflow start command in one transaction.
 2. Outbox processor publishes `WorkflowStartCommand`.
-3. Temporal workflow starts and records `workflow_run`.
+3. LangGraph extraction run starts and records `extraction_run`.
 4. Workflow transitions:
    `received -> stored -> queued -> processing`
 5. Activities execute in order:

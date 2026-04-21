@@ -1,5 +1,9 @@
 # Shared Data Contracts and JSON Schemas for Ops Agent
 
+## Current Documents Module Baseline
+
+For document information extraction contracts, use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the current source of truth. The active schema is the strict identity-document JSON object with required fields, `null` for unknown values, and `additionalProperties: false`. Contracts must include `document_uuid`, `extraction_uuid`, status, model name, prompt version, schema version, attempts, validation errors, raw LLM artifact URI, extracted payload, reviewed payload, and audit event links.
+
 ## Role
 
 Data Architect and AI Systems Engineer for a banking-grade Document Processing Agent.

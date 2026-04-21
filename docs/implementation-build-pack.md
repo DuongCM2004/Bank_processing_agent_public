@@ -2,6 +2,10 @@
 
 This build pack is implementation-oriented and aligned to the current repository. It extends the existing FastAPI MVP with machine-readable contracts, database migrations, frontend scaffold files, workflow contracts, audit/logging helpers, and delivery structure.
 
+## Current Documents Module Baseline
+
+For document information extraction, implement against [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md). The build target is FastAPI document upload, object storage, async workers, Pillow preprocessing, LangGraph orchestration, OpenAI GPT-4o or GPT-4o-mini Vision structured extraction, strict schema validation, one retry, normalization, manual review, approved-only PostgreSQL persistence, audit trail, and UUID search. Do not add dataset preparation, training, benchmarking, or evaluation tasks to the Documents extraction build.
+
 ## Assumptions
 
 - Banking operations context is mandatory.

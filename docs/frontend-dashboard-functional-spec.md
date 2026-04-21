@@ -8,13 +8,27 @@ Senior Frontend Product Designer and Ops Dashboard Designer for a banking-grade 
 
 Define the screens, flows, components, information hierarchy, and role-based interactions needed for operations, compliance, and review users in a form that frontend engineers can implement directly.
 
+## Current Documents Module Baseline
+
+The frontend must align with [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+For the Documents module, the UI is centered on LLM-extracted structured fields, not OCR model output:
+
+1. Upload creates `document_uuid` and `extraction_uuid`.
+2. Processing states are `uploaded`, `queued`, `preprocessing`, `extracting`, `validating`, `retrying`, `extracted`, `in_review`, `approved`, `rejected`, `persisted`, and `failed`.
+3. The extraction screen displays the source document preview and editable table of extracted fields.
+4. Required table fields are the strict identity-document schema fields.
+5. Reviewer actions are `edit`, `approve`, and `reject`.
+6. Only approved reviewed data is persisted.
+7. Audit view must support lookup by document UUID or extraction UUID.
+
 ## Assumptions
 
 1. The frontend is an internal React / Next.js workstation.
-2. The backend APIs follow the current case-centric contract defined in [api-specification.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\api-specification.md).
+2. The backend APIs follow the current document-UUID-centric contract defined in [api-specification.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\api-specification.md).
 3. The UI must make source evidence, uncertainty, workflow status, and allowed actions obvious at all times.
 4. Human review is a first-class part of the workflow, not an exception path.
-5. MVP scope remains limited to retail KYC onboarding, income verification, bank statement analysis, and loan document intake.
+5. MVP Documents scope centers on identity document extraction, editable manual review, approved-only persistence, audit trail, and UUID search.
 
 ## Deliverables
 
@@ -322,11 +336,13 @@ Allow reviewers to inspect, compare, and correct extracted fields with minimal e
 
 Fields grouped by section:
 
-1. identity
-2. address
-3. income
-4. statement metadata
-5. loan packet metadata
+1. document identity
+2. person name
+3. identity numbers
+4. dates
+5. demographics
+6. issuer and address
+7. raw visible text
 
 ### 8.3 Required row content
 
@@ -334,24 +350,23 @@ Each field row shows:
 
 1. field label
 2. extracted value
-3. normalized value if different
-4. confidence badge
-5. required / optional marker
-6. reason code if missing or conflicted
-7. evidence link
-8. correction action if allowed
+3. reviewed value
+4. validation status
+5. last edited by
+6. last edited at
+7. correction action if allowed
 
 ### 8.4 Comparison behavior
 
-1. if normalized value differs materially, show both original and normalized values
-2. if a reviewer corrected the field, show machine value and reviewer-confirmed value distinctly
-3. unresolved conflicts display candidate values instead of one forced value
+1. show extracted value and reviewed value distinctly
+2. if a reviewer corrected the field, preserve the original LLM value in the row
+3. unresolved validation errors display as explicit validation status, not as a hidden tooltip
 
 ### 8.5 Uncertainty rules
 
-1. low-confidence rows are visually promoted
-2. missing required fields pin to the top of the section
-3. conflicts must show explicit reason codes and evidence gaps
+1. fields with `null` values remain visible and editable
+2. schema validation errors pin to the top of the section
+3. invalid or rejected rows must show explicit status and audit linkage
 
 ## 9. Validation and Issue Panel Specification
 

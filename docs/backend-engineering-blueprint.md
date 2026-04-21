@@ -8,6 +8,25 @@ Backend Engineer for a banking-grade Document Processing Agent.
 
 Build the backend services, workflow orchestration, APIs, persistence, and service integrations required to run the document processing platform safely and reliably.
 
+## Current Extraction Baseline
+
+The backend implementation target for the Documents module is [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+Backend teams must treat document information extraction as an inference-only workflow:
+
+1. FastAPI accepts image/PDF upload and returns `document_uuid`, `extraction_uuid`, and `queued` status.
+2. Object storage stores raw files, preprocessed page images, raw LLM responses, and normalized payload artifacts.
+3. Async workers run Python/Pillow preprocessing and base64 data URL encoding.
+4. LangGraph owns the extraction graph and retry routing.
+5. OpenAI GPT-4o or GPT-4o-mini Vision performs structured JSON extraction.
+6. Pydantic or JSON Schema enforces the identity-document schema with no additional fields.
+7. Validation failure triggers one retry with a stricter prompt.
+8. Normalized JSON becomes an editable review table.
+9. Review approval is required before production persistence.
+10. Audit events and UUID search are mandatory for every lifecycle step.
+
+Do not design backend extraction as dataset preparation, model training, model testing, benchmarking, evaluation, or traditional OCR engine integration.
+
 ## Assumptions
 
 1. The current repo already contains an MVP FastAPI foundation with case creation, document registration, review tasks, corrections, escalations, revalidation, closure, and audit event retrieval.
@@ -48,7 +67,7 @@ Build the backend services, workflow orchestration, APIs, persistence, and servi
 
 1. keep service count logical but operationally manageable
 2. prefer one repository with modular services over fragmented independent repos
-3. use Temporal for orchestration, Kafka for domain events, Celery for compute dispatch
+3. use LangGraph for extraction orchestration and Celery, Redis Queue, or background workers for compute dispatch
 4. keep API contracts stable and narrow
 
 ### Scale
@@ -64,14 +83,12 @@ Build the backend services, workflow orchestration, APIs, persistence, and servi
 | Service | Responsibility | Runtime |
 |---|---|---|
 | `api-gateway` | ingress, auth forwarding, rate limiting, routing | Kong or Nginx |
-| `case-service` | case lifecycle APIs and read/write metadata | FastAPI |
-| `ingestion-service` | document intake, checksum, storage registration | FastAPI |
-| `workflow-service` | Temporal workflow start, signals, workflow state API | FastAPI |
-| `review-service` | reviewer task management and manual actions | FastAPI |
-| `compliance-service` | compliance control statuses and escalations | FastAPI |
-| `decision-service` | route and disposition recommendation | FastAPI |
+| `document-upload-service` | document intake, checksum, storage registration, UUID creation | FastAPI |
+| `document-status-service` | document and extraction status APIs | FastAPI |
+| `workflow-service` | async extraction job dispatch and workflow-visible status API | FastAPI |
+| `manual-review-service` | editable table review, approval, rejection, reviewed payload validation | FastAPI |
 | `audit-service` | immutable event write and event query | FastAPI |
-| `ocr/classification/extraction/validation workers` | async AI and rules execution | Celery workers |
+| `preprocessing/extraction/validation/retry workers` | Pillow preprocessing, GPT-4o Vision calls, schema validation, retry, normalization | Celery or background workers |
 
 ## 1.2 Service boundary rule
 
@@ -90,29 +107,23 @@ No service may mutate another service's private persistence tables directly.
 1. API services remain stateless.
 2. PostgreSQL stores durable state.
 3. S3 / MinIO stores source and derived artifacts.
-4. Kafka distributes domain events.
-5. Temporal manages long-running workflows and human-wait states.
-6. Celery executes heavy async jobs and retries compute tasks.
+4. Event or queue infrastructure distributes extraction jobs and audit-worthy lifecycle events.
+5. LangGraph manages extraction node execution and one retry.
+6. Celery, Redis Queue, or background workers execute async preprocessing, extraction, validation, and normalization tasks.
 
 ## 2. API Specification
 
 ## 2.1 External API groups
 
-### Case APIs
+### Documents APIs
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/v1/cases` | create case and register initial document bundle |
-| `GET` | `/v1/cases/{case_id}` | fetch case status and metadata |
-| `GET` | `/v1/cases/{case_id}/results` | fetch extraction, validation, and recommended route |
-| `GET` | `/v1/cases/{case_id}/audit-events` | fetch immutable audit history |
-
-### Document APIs
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/v1/cases/{case_id}/documents` | attach additional document to open case |
-| `GET` | `/v1/cases/{case_id}/documents/{document_id}` | fetch document metadata |
+| `POST` | `/documents/upload` | upload document, store raw file, create document and extraction UUIDs, queue extraction |
+| `GET` | `/documents/{uuid}/status` | fetch document and latest extraction status |
+| `GET` | `/documents/{uuid}/extraction` | fetch extracted and reviewed data for editable table UI |
+| `POST` | `/documents/{uuid}/review` | submit reviewer edit, approval, or rejection |
+| `GET` | `/audit/{uuid}` | fetch audit events by document or extraction UUID |
 
 ### Review APIs
 
@@ -139,21 +150,18 @@ No service may mutate another service's private persistence tables directly.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/internal/workflows/start` | start Temporal case workflow |
-| `POST` | `/internal/workflows/{case_id}/signal-review-complete` | resume workflow after human action |
-| `GET` | `/internal/workflows/{case_id}` | workflow execution status |
+| `POST` | `/internal/documents/{document_uuid}/extract` | start queued extraction run |
+| `GET` | `/internal/extractions/{extraction_uuid}/status` | inspect extraction run status |
+| `POST` | `/internal/extractions/{extraction_uuid}/complete-review` | finalize approved or rejected review action |
 
 ### AI / rules services
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/internal/ocr/jobs` | submit OCR task |
-| `POST` | `/internal/layout/jobs` | submit layout task |
-| `POST` | `/internal/classification/jobs` | submit classification task |
+| `POST` | `/internal/preprocessing/jobs` | submit image preprocessing task |
 | `POST` | `/internal/extraction/jobs` | submit extraction task |
 | `POST` | `/internal/validation/jobs` | submit validation task |
-| `POST` | `/internal/compliance/evaluate` | evaluate compliance controls |
-| `POST` | `/internal/decision/evaluate` | compute route and next action |
+| `POST` | `/internal/normalization/jobs` | submit normalization task |
 
 ## 2.3 API contract principles
 
@@ -178,51 +186,34 @@ No service may mutate another service's private persistence tables directly.
 
 ## 3. Workflow Orchestration Design
 
-## 3.1 Why Temporal
+## 3.1 Why LangGraph
 
-Temporal is the correct orchestration layer because the backend requires:
+LangGraph is the correct extraction orchestration layer because the backend requires:
 
 1. durable state across restarts,
-2. explicit retries,
-3. human review wait states,
-4. replayable execution history,
-5. timers and SLA-aware workflow control.
+2. explicit extraction nodes,
+3. conditional retry routing,
+4. validation-aware branching,
+5. replayable extraction run metadata.
 
 ## 3.2 Workflow model
 
-### Parent workflow
+One extraction graph per `extraction_uuid`:
 
-One parent workflow per case:
-
-1. create case
-2. register documents
-3. spawn per-document child workflows
-4. aggregate document outputs
-5. run case-level validation and compliance checks
-6. route to next action
-7. pause on human review when required
-8. resume on signal
-9. close case or escalate
-
-### Child workflow
-
-One child workflow per document version:
-
-1. render pages
-2. OCR
-3. layout
-4. classification
-5. extraction
-6. per-document validation
-7. artifact registration
+1. preprocess document image or PDF page,
+2. call GPT-4o Vision or GPT-4o-mini with strict JSON schema,
+3. validate output,
+4. retry once if schema validation fails,
+5. normalize valid JSON into editable table rows,
+6. finalize as `extracted`, `in_review`, or `failed`.
 
 ## 3.3 Orchestration semantics
 
-1. Temporal owns workflow state.
+1. LangGraph owns extraction node execution and retry routing.
 2. PostgreSQL owns domain state.
 3. Workflow transitions only after successful durable writes.
 4. Every transition emits an audit event.
-5. Human review completion is modeled as a Temporal signal, not a polling loop.
+5. Human review completion is modeled as an explicit review command, not a polling side effect.
 
 ## 4. Queue / Job Design
 
@@ -230,16 +221,12 @@ One child workflow per document version:
 
 | Queue / topic | Purpose | Worker type |
 |---|---|---|
-| `document.received` | new case/document ingestion event | Kafka consumer |
-| `ocr.jobs.gpu` | OCR tasks requiring GPU | Celery GPU worker |
-| `ocr.jobs.cpu` | OCR fallback or overflow | Celery CPU worker |
-| `layout.jobs` | layout parsing tasks | Celery worker |
-| `classification.jobs` | classification tasks | Celery worker |
-| `extraction.jobs` | extraction tasks | Celery worker |
+| `document.uploaded` | new document upload event | queue consumer |
+| `preprocessing.jobs` | image validation, PDF rendering, resize, base64 encoding | Celery or background worker |
+| `extraction.jobs` | GPT-4o Vision structured extraction | Celery or background worker |
 | `validation.jobs` | validation tasks | Celery worker |
-| `compliance.jobs` | compliance evaluation | Celery / service task |
-| `decision.jobs` | route computation | Celery / service task |
-| `review.required` | review task creation event | Kafka consumer |
+| `normalization.jobs` | flatten strict JSON into table rows | Celery or background worker |
+| `review.required` | review task creation event | queue consumer |
 | `pipeline.dlq` | dead-letter failures | DLQ handler |
 
 ## 4.2 Job contract
@@ -497,7 +484,7 @@ Backend does not parse raw model internals; it consumes structured outputs only.
 2. add artifact registry and S3 integration
 3. add auth middleware and role enforcement
 4. add outbox/event publisher
-5. introduce Temporal workflow service
+5. introduce LangGraph extraction workflow service
 6. add worker job contracts and queue execution
 7. add compliance-state model and separation from case state
 8. add OpenSearch projection layer

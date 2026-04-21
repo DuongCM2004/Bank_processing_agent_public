@@ -1,5 +1,9 @@
 # Backend Service Decomposition and Workflow Execution Design for Ops Agent
 
+## Current Documents Module Baseline
+
+For document information extraction, use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the current implementation source. The active workflow is FastAPI upload, object storage, async worker dispatch, Python/Pillow preprocessing, LangGraph orchestration, OpenAI GPT-4o or GPT-4o-mini Vision structured JSON extraction, strict schema validation, one retry, manual review, approved-only PostgreSQL persistence, audit trail, and UUID search. Older service splits around OCR model training, classical ML extraction, dataset preparation, benchmarking, or evaluation do not apply to the Documents extraction module.
+
 ## Role
 
 Senior Backend Engineer for a banking-grade Document Processing Agent.

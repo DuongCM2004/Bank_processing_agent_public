@@ -8,11 +8,29 @@ Prompt Engineer and Agent Workflow Designer for a banking-grade Document Process
 
 Create a conservative, bounded, and testable prompt system for all agents in the platform, with explicit role boundaries, shared policies, structured outputs, evidence requirements, escalation language, and a refinement workflow suitable for regulated banking operations.
 
+## Current Prompt Baseline
+
+The active Documents module prompt design is the GPT-4o Vision structured extraction prompt in [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+The prompt system for identity-card extraction is inference-only:
+
+1. Use OpenAI GPT-4o or GPT-4o-mini with image input.
+2. Use strict JSON schema output with `additionalProperties: false`.
+3. Require all schema fields.
+4. Use `null` for unknown or uncertain values.
+5. Return no markdown, explanation, or extra keys.
+6. Preserve visible text when possible.
+7. Do not hallucinate missing values.
+8. Retry once with a stricter prompt if validation fails.
+9. Store prompt version, schema version, model name, raw response URI, attempts, and validation errors.
+
+This prompt pack does not include dataset generation, prompt benchmark sections, model training prompts, or evaluation workflows for extraction.
+
 ## Assumptions
 
-1. Deterministic logic remains the default path for ingestion, validation, compliance gating, and decision boundaries.
-2. LLMs are used only where ambiguity remains after rules and classical ML.
-3. Every prompt-driven output must be attributable to a prompt version, model version, schema version, and evidence set.
+1. Strict schema validation remains the default control boundary for extraction.
+2. GPT-4o Vision is the primary OCR-like reading and semantic extraction engine for identity documents.
+3. Every prompt-driven output must be attributable to a prompt version, model version, schema version, extraction UUID, and raw response artifact.
 4. Agent prompts must not collapse role boundaries. No agent may silently become a policy, compliance, or approval agent if that is not its defined function.
 5. Shared schemas from the AI architecture document remain the source of truth for API-level contracts.
 
@@ -45,8 +63,8 @@ Create a conservative, bounded, and testable prompt system for all agents in the
 ### MVP
 
 1. Keep prompt usage narrow and highly bounded.
-2. Default to rules-only behavior for ingestion, validation, compliance, decisioning, and audit agents unless a prompt is explicitly needed.
-3. Use prompts primarily for ambiguous extraction reconciliation, structured explanation, and reviewer-facing summarization.
+2. Use prompts for strict identity-document structured extraction only.
+3. Keep manual review, approval, rejection, and production persistence outside the LLM's authority.
 
 ### Scale
 
@@ -240,6 +258,8 @@ In these cases, the prompt must return:
 
 | Prompt ID | Agent | When used | Normal path |
 |---|---|---|---|
+| `identity_document_extraction_v1` | LLM Adapter | first GPT-4o Vision extraction attempt | primary extraction path |
+| `identity_document_extraction_retry_v1` | Retry Handler | previous output failed schema validation | one retry only |
 | `ingestion_exception_explainer_v1` | Ingestion Agent | explain rejected intake to operator | rarely used |
 | `ocr_reconcile_v1` | OCR Agent | reconcile low-confidence OCR segments | bounded fallback |
 | `layout_region_label_v1` | Layout Parsing Agent | label ambiguous regions | bounded fallback |
@@ -250,6 +270,38 @@ In these cases, the prompt must return:
 | `decision_explainer_v1` | Decision Agent | produce structured rationale for already-computed route | optional |
 | `audit_event_summary_v1` | Audit Agent | generate human-readable audit digest from stored events | optional |
 | `review_copilot_v1` | Human Review Agent | reviewer assist for evidence-linked summaries only | common reviewer aid |
+
+### Identity Document Extraction Prompt
+
+```text
+You extract information from identity-card-like images.
+
+Rules:
+1. Return only the JSON object defined by the schema.
+2. If the image is not an ID card or does not clearly contain a field, return null for that field.
+3. Preserve visible text exactly when possible.
+4. Do not hallucinate.
+5. Set document_type to the best short label you can infer from the image, such as:
+   "national_id", "passport", "driver_license", "resident_card", or null.
+6. raw_full_text should be a best-effort plain-text transcription of visible document text.
+7. If a field is uncertain, use null.
+```
+
+### Identity Document Retry Prompt
+
+```text
+You are re-running extraction because the previous output failed validation.
+
+Return exactly the required JSON schema.
+Use null for any missing, unclear, uncertain, or unsupported value.
+Do not include explanations.
+Do not include markdown.
+Do not include extra keys.
+All keys must be present.
+All non-null values must be strings.
+Keep values literal and compact.
+Do not hallucinate.
+```
 
 ## 4.2 Shared system prompt header
 

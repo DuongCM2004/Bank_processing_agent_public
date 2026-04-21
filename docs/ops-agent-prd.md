@@ -1,5 +1,9 @@
 # Ops Agent Product Requirements Document
 
+## Current Documents Module Baseline
+
+The current product baseline for document information extraction is [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md). The MVP Documents workflow is upload -> store -> queue -> preprocess -> GPT-4o Vision structured extraction -> strict validation -> one retry -> normalize -> editable table -> manual review -> approve/reject -> approved-only persistence -> audit -> UUID search. This is an inference-only LLM workflow and excludes dataset preparation, OCR model training, model benchmarking, and model evaluation.
+
 ## 1. Product Overview
 
 - Product: Banking Document Processing Agent ("Ops Agent")

@@ -1,5 +1,9 @@
 # Execution Delivery Plan for Ops Agent
 
+## Current Documents Module Baseline
+
+Delivery for the Documents extraction module must follow [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md). Workstreams should sequence upload/storage, async extraction workers, Pillow preprocessing, LangGraph orchestration, GPT-4o Vision adapter, strict schema validation, one retry, normalization, manual review, approved-only persistence, audit trail, and UUID search. Do not schedule dataset preparation, training, benchmarking, or model-evaluation work for the current Documents extraction release.
+
 ## Role
 
 Project Manager / Delivery Manager for a banking-grade Document Processing Agent.

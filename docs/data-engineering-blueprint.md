@@ -1,5 +1,9 @@
 # Data Engineering Blueprint for Ops Agent
 
+## Current Documents Module Baseline
+
+For document information extraction, use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the current implementation source. The data path is operational inference data only: raw files and raw LLM responses in object storage; `documents`, `extraction_runs`, `extracted_data`, `review_logs`, and `audit_events` in PostgreSQL; UUID search projections as optional read models. Dataset preparation, annotation, training, benchmarking, and model-evaluation datasets are outside the Documents extraction workflow.
+
 ## Role
 
 Data Engineer for a banking-grade Document Processing Agent.

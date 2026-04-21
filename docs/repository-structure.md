@@ -1,6 +1,10 @@
 # Ops Agent Monorepo Structure
 
 This document defines the target repository layout for the banking-grade Document Processing Agent MVP.
+
+## Current Documents Module Baseline
+
+Use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the current source for Documents module architecture, contracts, and implementation ownership. The active extraction design is inference-only GPT-4o Vision structured JSON extraction with LangGraph orchestration, not OCR model training or dataset preparation.
 It is optimized for:
 
 - clear app ownership

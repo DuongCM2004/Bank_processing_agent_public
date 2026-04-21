@@ -4,10 +4,23 @@ The backend keeps access control centralized in `ops_agent.security.rbac`.
 
 ## Roles
 
-- `ops_user`: case intake, case/document read, document upload, and document download.
-- `reviewer`: ops-user access plus manual review, workflow status updates, decisions, and audit reads.
-- `compliance_user`: read-only case/document access plus audit reads and compliance decision actions.
+- `ops_user`: document upload, document status read, extraction read, and artifact download where allowed.
+- `reviewer`: ops-user access plus extraction table edit, approve, reject, and audit reads.
+- `compliance_user`: read-only document/extraction access plus audit reads and reviewed-data approval where policy grants it.
 - `admin`: all MVP permissions.
+
+## Documents Module Permissions
+
+The current Documents module follows [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md).
+
+Permission checks must cover:
+
+- `document:upload` for `POST /documents/upload`
+- `document:read` for `GET /documents/{uuid}/status`
+- `extraction:read` for `GET /documents/{uuid}/extraction`
+- `review:write` for reviewer edits and rejects through `POST /documents/{uuid}/review`
+- `review:approve` for approval through `POST /documents/{uuid}/review`
+- `audit:read` for `GET /audit/{uuid}`
 
 ## Backend Enforcement
 
@@ -23,9 +36,10 @@ The permission map lives in `ROLE_PERMISSIONS`, so role-to-capability changes ha
 
 Frontend code should not treat hidden controls as authorization. Use backend authorization as the source of truth. For UX, map the authenticated user's permissions to:
 
-- show case creation/upload controls only with `case:create` or `document:upload`
-- show correction/resubmit controls only with `manual_review:write`
-- show approve/reject controls only with `decision:write`
+- show document upload controls only with `document:upload`
+- show extraction table only with `extraction:read`
+- show correction/reject controls only with `review:write`
+- show approve controls only with `review:approve`
 - show audit timeline pages only with `audit:read`
 
 When a backend request returns `403 permission_denied`, render a clear read-only or unauthorized state instead of retrying silently.

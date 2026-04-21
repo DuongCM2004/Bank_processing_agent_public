@@ -1,6 +1,10 @@
 # Database Schema And Migration Plan
 
-This document is the implementation-oriented database plan for the banking Document Processing Agent. It is aligned to the current migrations in [db/migrations](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/db/migrations) and fills the remaining MVP gaps around OCR, compliance/risk, evidence linking, and identity.
+This document is the implementation-oriented database plan for the banking Document Processing Agent. It is aligned to the current migrations in [db/migrations](/D:/Self_study/computer_science/Personal_project/bank_document_processing_agent/db/migrations) and fills the remaining MVP gaps around LLM extraction, manual review, evidence linking, audit, and identity.
+
+## Current Documents Module Baseline
+
+Use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the current migration source for document extraction. Required production tables are `documents`, `extraction_runs`, `extracted_data`, `review_logs`, and `audit_events`, with UUID indexes, lifecycle status fields, raw-vs-reviewed payload separation, and approved-only persistence. Dataset, training, benchmark, and model-evaluation tables are not part of the current Documents extraction migration scope.
 
 ## 1. Relational Schema For Core Entities
 

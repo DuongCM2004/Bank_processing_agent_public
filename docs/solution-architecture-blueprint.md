@@ -12,9 +12,25 @@ Create a coherent, end-to-end technical blueprint that aligns product, AI, backe
 
 1. MVP scope remains limited to retail `kyc_onboarding`, `income_verification`, `bank_statement_analysis`, and `loan_document_intake`.
 2. The platform is an internal operations system, not a customer-facing banking core.
-3. VietOCR is the mandated OCR engine and remains the only primary OCR path.
+3. The primary extraction path is OpenAI GPT-4o or GPT-4o-mini Vision with strict structured JSON output. The system does not use traditional OCR engines such as Tesseract or a trained OCR model as the extraction source of truth.
 4. Human review is mandatory for regulated, high-risk, ambiguous, escalated, or exception-based cases.
 5. Product, banking-domain, compliance, and AI architecture documents already define the operating rules; this document integrates them into a single delivery blueprint.
+
+## Current Extraction Baseline
+
+Use [production-llm-document-extraction-backend-spec.md](D:\Self_study\computer_science\Personal_project\bank_document_processing_agent\docs\production-llm-document-extraction-backend-spec.md) as the canonical backend design for the Documents module.
+
+The platform baseline is inference-only:
+
+1. User uploads image or PDF.
+2. Backend stores the raw file in object storage.
+3. Async worker runs Pillow preprocessing and base64 image encoding.
+4. LangGraph orchestrates GPT-4o Vision structured extraction.
+5. Pydantic or JSON Schema enforces required fields and forbids extra fields.
+6. Invalid schema output gets one retry with a stricter prompt.
+7. Extracted JSON is normalized into table rows for manual review.
+8. Only approved reviewed data is persisted to production tables.
+9. Audit events and UUID search cover every lifecycle step.
 
 ## Deliverables
 
@@ -52,22 +68,18 @@ External Sources
      -> case-service
      -> workflow-service
      -> review-service
-     -> compliance-service
-     -> decision-service
      -> audit-service
-  -> Temporal workflow engine
-  -> Kafka event bus
-  -> Celery worker pools
-     -> OCR workers (VietOCR + OpenCV + PyTorch)
-     -> layout workers
-     -> classification workers
-     -> extraction workers
-     -> validation workers
+  -> Redis / Celery or background worker queue
+  -> LangGraph extraction workers
+     -> preprocessing workers (Python + Pillow)
+     -> LLM adapter (OpenAI GPT-4o / GPT-4o-mini Vision)
+     -> schema validation workers (Pydantic / JSON Schema)
+     -> retry and normalization workers
   -> Shared data plane
      -> S3 / MinIO for raw docs and evidence artifacts
      -> PostgreSQL for transactional metadata
      -> OpenSearch for operational search and audit indexing
-     -> Weaviate for semantic retrieval where explicitly allowed
+     -> optional search projection for UUID lookup and audit retrieval
   -> Human review workstation (Next.js / React)
   -> Observability and security plane
      -> ELK
@@ -80,7 +92,7 @@ External Sources
 
 1. Keep the system modular by separating orchestration, compute, transactional APIs, and human review.
 2. Keep the MVP thin by building a small number of services around the most important domain boundaries.
-3. Put rules and compliance gates ahead of ML and LLM behavior.
+3. Put strict schema validation, manual review, approved-only persistence, and auditability around all LLM extraction behavior.
 4. Treat every material system step as an auditable event.
 5. Make all external integrations replaceable through stable service interfaces.
 
@@ -93,7 +105,7 @@ External Sources
 3. Worker plane
    Celery-backed compute services for OCR, layout parsing, classification, extraction, and validation tasks.
 4. Orchestration plane
-   Temporal for durable long-running workflow state, timers, human-review pauses, and retries.
+   LangGraph for extraction node execution, validation routing, one retry, normalization, and output finalization.
 5. Data plane
    PostgreSQL for transactional state, S3 / MinIO for evidence artifacts, OpenSearch for read-optimized search and audit indexing, optional Weaviate for restricted semantic retrieval.
 6. Observability and security plane
@@ -105,18 +117,16 @@ External Sources
 
 1. `api-gateway`
 2. `auth-service` integration with Keycloak
-3. `ingestion-service`
-4. `case-service`
-5. `workflow-service`
-6. `ocr-service`
-7. `classification-service`
-8. `extraction-service`
-9. `validation-service`
-10. `compliance-service`
-11. `decision-service`
-12. `review-service`
-13. `audit-service`
-14. `frontend-review-app`
+3. `document-upload-service`
+4. `document-status-service`
+5. `extraction-worker-service`
+6. `llm-adapter-service`
+7. `validation-service`
+8. `manual-review-service`
+9. `persistence-service`
+10. `audit-service`
+11. `uuid-search-service`
+12. `frontend-review-app`
 
 #### Defer to scale phase
 
@@ -131,11 +141,10 @@ External Sources
 
 1. Microservices vs delivery speed
    Use real service boundaries, but keep MVP deployable as a small platform estate rather than a sprawl of independently operated services.
-2. Temporal plus Kafka plus Celery
-   This adds operational complexity, but gives clear separation:
-   Temporal for stateful orchestration, Kafka for domain events, Celery for compute execution.
-3. Rules-first over AI-first
-   This reduces novelty and some automation reach, but improves auditability, predictability, and compliance safety.
+2. LangGraph plus async workers
+   LangGraph controls the extraction graph while Celery, Redis Queue, or equivalent workers keep upload APIs responsive.
+3. Strict schema plus manual review over free-form AI output
+   This improves auditability, predictability, and compliance safety around GPT-4o Vision extraction.
 4. PostgreSQL as source of truth with OpenSearch as read model
    This avoids stale-search corruption of workflow truth at the cost of maintaining indexing pipelines.
 
@@ -147,20 +156,16 @@ External Sources
 | Keycloak config | identity, SSO, RBAC | Security Platform | Frontend, Backend |
 | Ingestion service | upload, checksum, storage registration | Backend | Security, Ops |
 | Case service | case metadata, state APIs | Backend | Product |
-| Workflow service / Temporal | orchestration and retry logic | Backend Platform | AI, Review |
-| OCR service | OpenCV preprocessing, VietOCR inference | AI Platform | Infrastructure |
-| Layout service | structural segmentation | AI Platform | Backend |
-| Classification service | document type prediction | AI / ML | Product, QA |
-| Extraction service | field extraction + evidence | AI / ML | Banking Domain, QA |
-| Validation service | deterministic and cross-document rules | Backend + Rules | Banking Domain |
-| Compliance service | KYC/AML control statuses and gates | Compliance Engineering | Compliance, Risk |
-| Decision service | routing and automation boundaries | Backend + Product | Compliance, AI |
+| Workflow service | async job dispatch and document status transitions | Backend Platform | AI, Review |
+| Preprocessing service | image/PDF validation, resize, RGB conversion, base64 data URL encoding | AI Platform | Backend |
+| Extraction orchestrator | LangGraph graph execution and retry routing | AI Platform | Backend |
+| LLM adapter | GPT-4o Vision / GPT-4o-mini structured JSON extraction | AI Platform | Security, Backend |
+| Validation service | strict Pydantic or JSON Schema validation | Backend + AI | Banking Domain |
 | Review service | reviewer tasks and manual actions | Backend | Frontend, Ops |
 | Audit service | append-only events and trace access | Platform Engineering | Compliance, Audit |
 | PostgreSQL | system-of-record metadata | Data Platform | Backend |
 | S3 / MinIO | raw docs and artifacts | Data Platform | Security |
 | OpenSearch | operational search and audit indexing | Data Platform | Platform |
-| Weaviate | semantic retrieval store | AI Platform | Data Platform |
 | Frontend review app | workstation UI | Frontend | Product, Ops |
 | Observability stack | logs, metrics, traces, alerting | SRE / Platform | All teams |
 | Rules / policy packs | business and compliance logic | Compliance + Product | Banking Domain, Backend |
@@ -178,10 +183,10 @@ Each team owns its service boundary and schema versioning. Cross-team dependenci
 
 1. Channel and intake layer
    Accepts documents and metadata from branch, ops, email, or upstream APIs and turns them into controlled cases.
-2. Workflow and decision layer
-   Controls state transitions, orchestration, retries, compliance gates, escalation, and case closure.
+2. Workflow and review layer
+   Controls document status transitions, extraction orchestration, one retry, review state, and approved-only persistence.
 3. AI processing layer
-   Produces OCR, layout, classification, extraction, and validation-support outputs with evidence and version metadata.
+   Produces strict JSON extraction outputs with model, prompt, schema, retry, and validation metadata.
 4. Review and operations layer
    Gives analysts case queues, document viewers, correction tools, escalation actions, and audit visibility.
 5. Data and observability layer
@@ -194,18 +199,17 @@ Each team owns its service boundary and schema versioning. Cross-team dependenci
 1. User or upstream system submits document bundle through gateway.
 2. Ingestion service stores raw files in S3 / MinIO and persists case/document metadata in PostgreSQL.
 3. Ingestion service emits `document.received`.
-4. Workflow service starts a Temporal case workflow.
-5. OCR service retrieves document pages, preprocesses with OpenCV, runs VietOCR, and writes OCR artifacts to S3.
-6. Layout service reads page images and OCR blocks, computes document structure, and writes layout artifacts.
-7. Classification service reads OCR/layout features, classifies document type, and persists result.
-8. Extraction service applies deterministic extraction first and optional bounded fallback second; field outputs and evidence refs are stored.
-9. Validation service executes field, freshness, and cross-document rules and writes validation results.
-10. Compliance service updates control statuses and raises escalations where necessary.
-11. Decision service aggregates all upstream outputs and chooses `auto_process`, `cross_check`, `human_review`, or `specialist_escalation`.
-12. Review service creates manual tasks when required.
-13. Human reviewer corrects fields, approves, rejects, or escalates.
-14. Workflow service revalidates and closes only after required controls are completed.
-15. Audit service records all events and indexes them into search.
+4. Workflow service queues an extraction run and starts the LangGraph-backed worker flow.
+5. Preprocessing service validates, resizes, and encodes the document image.
+6. LangGraph starts the extraction graph.
+7. LLM adapter calls GPT-4o Vision or GPT-4o-mini with strict JSON schema output.
+8. Validation service enforces required fields, `null` for unknown values, and no additional fields.
+9. Retry handler runs one stricter extraction prompt if validation fails.
+10. Normalization service flattens valid JSON into an editable table.
+11. Review service creates manual review work.
+12. Human reviewer corrects fields, approves, or rejects.
+13. Persistence service writes only approved reviewed data to production tables.
+14. Audit service records all events and indexes UUID search projections where needed.
 
 ### 3.2 Artifact storage model
 
@@ -213,10 +217,10 @@ Each team owns its service boundary and schema versioning. Cross-team dependenci
 |---|---|---|
 | Raw uploaded document | S3 / MinIO | system of record for source evidence |
 | Derived page images | S3 / MinIO | OCR and review evidence |
-| OCR output | S3 / MinIO + PostgreSQL refs | traceability and replay |
-| Layout output | S3 / MinIO + PostgreSQL refs | extraction evidence |
-| Extraction output | PostgreSQL + S3 evidence | downstream consumption |
-| Validation results | PostgreSQL | decisioning and audit |
+| Preprocessed images | object storage + PostgreSQL refs | extraction replay and troubleshooting |
+| Raw LLM response | object storage + PostgreSQL refs | traceability and replay |
+| Extracted payload | PostgreSQL + object storage artifact | staged review input |
+| Reviewed payload | PostgreSQL | approved source for production persistence |
 | Compliance control results | PostgreSQL | gating and examination |
 | Audit events | PostgreSQL + immutable store + OpenSearch index | reconstruction and audit |
 | Prompt/response artifacts | encrypted S3 | explainability and model governance |
@@ -241,7 +245,7 @@ This separation prevents accidental overwrites and simplifies retention policy e
 | External client to platform | synchronous REST via gateway | upload, case status, review actions |
 | Internal service to service | synchronous REST for command/query | metadata updates, task operations |
 | Async domain events | Kafka topics | workflow progression, audit fan-out, alerts |
-| Long-running orchestration | Temporal activities and signals | retries, waits, human review |
+| Extraction orchestration | LangGraph nodes and async worker jobs | preprocessing, extraction, validation, retry, normalization |
 | Artifact exchange | signed S3 object refs | OCR, layout, extraction evidence |
 
 ### 4.2 Required internal interfaces
@@ -317,7 +321,7 @@ No service may read another service's private tables directly. Shared access occ
 ### 4.5 End-to-end integration flow
 
 1. Backend control services receive requests through the gateway and persist case intent in PostgreSQL.
-2. Workflow service starts or advances the Temporal case workflow and dispatches compute steps through Celery and or Kafka.
+2. Workflow service starts or advances the document extraction run and dispatches compute steps through Celery, Redis Queue, or background workers.
 3. AI services fetch source artifacts from S3 / MinIO, produce derived artifacts, and persist result metadata back through their owning services.
 4. Validation, compliance, and decision services combine deterministic rules, upstream AI outputs, and workflow context to determine next routing action.
 5. Review service exposes reviewer tasks and case details to the Next.js UI using backend APIs and approved read models.
@@ -356,7 +360,7 @@ No service may read another service's private tables directly. Shared access occ
 2. Metrics
    Exposed through Prometheus for service health, workflow latency, queue depth, retry counts, review backlog, and AI quality indicators.
 3. Distributed tracing
-   OpenTelemetry traces span gateway, FastAPI services, Temporal activities, worker jobs, database calls, and storage operations.
+   OpenTelemetry traces span gateway, FastAPI services, LangGraph nodes, worker jobs, database calls, and storage operations.
 4. Operational dashboards
    Separate views for platform health, review-queue health, AI pipeline health, and compliance backlog.
 5. Alerting
@@ -395,7 +399,7 @@ No service may read another service's private tables directly. Shared access occ
 #### Scale
 
 1. Platform target availability: `99.9%+`
-2. Planned HA for PostgreSQL, Kafka, Temporal, and object storage
+2. Planned HA for PostgreSQL, queue infrastructure, worker infrastructure, and object storage
 
 ### 6.3 Performance
 
@@ -446,7 +450,7 @@ No service may read another service's private tables directly. Shared access occ
 3. S3 / MinIO
 4. Kafka
 5. Redis
-6. Temporal
+6. LangGraph runtime
 7. OpenSearch
 8. Weaviate
 9. GPU-enabled OCR worker environment
@@ -492,18 +496,19 @@ No service may read another service's private tables directly. Shared access occ
 2. gateway, auth, and core metadata services
 3. object storage and PostgreSQL setup
 4. ingestion and audit services
-5. Temporal workflow and Kafka backbone
-6. VietOCR OCR service and OpenCV preprocessing
-7. deterministic classification and extraction for in-scope documents
-8. validation and compliance services
-9. decision service
-10. reviewer UI
-11. pilot observability dashboards and alerting
+5. async worker queue and LangGraph extraction backbone
+6. Pillow preprocessing service
+7. GPT-4o Vision LLM adapter
+8. strict schema validation and retry handling
+9. normalization and editable review table
+10. approved-only persistence and audit events
+11. reviewer UI and UUID search
+12. pilot observability dashboards and alerting
 
 #### Beta
 
-1. classical ML classification improvements
-2. LLM bounded fallback path
+1. prompt and schema version governance improvements
+2. alternate model policy for GPT-4o and GPT-4o-mini routing
 3. email ingestion
 4. downstream LOS / onboarding integrations
 5. supervisor dashboards
@@ -514,14 +519,14 @@ No service may read another service's private tables directly. Shared access occ
 1. HA and failover hardening
 2. multi-team / multi-region configuration
 3. advanced analytics and broader document taxonomy
-4. automated drift monitoring and shadow testing pipelines
+4. stronger audit exports and lifecycle analytics
 
 ### 8.2 Parallelization guidance
 
 These tracks can run in parallel after shared schemas are stable:
 
 1. Backend core services
-2. AI OCR / extraction pipeline
+2. LLM extraction pipeline
 3. Frontend review workstation
 4. Platform / SRE environment and observability
 5. Security / IAM / secrets
@@ -531,11 +536,11 @@ These tracks can run in parallel after shared schemas are stable:
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Over-designed MVP with too many services too early | slows delivery and integration | keep service count logical but deployable in one repo or small mono-platform initially |
-| VietOCR quality variance on low-quality scans | extraction degradation | aggressive OpenCV preprocessing, region re-OCR, human fallback |
-| Workflow complexity across Temporal, Kafka, and Celery | operational burden | clear separation: Temporal for orchestration, Kafka for events, Celery for compute only |
+| LLM extraction quality variance on low-quality scans | extraction degradation | Pillow preprocessing, strict null-for-unknown prompting, one retry, and human review |
+| Workflow complexity across LangGraph and async workers | operational burden | keep LangGraph responsible for extraction routing and workers responsible for execution only |
 | Hidden coupling between services through shared DB reads | brittle architecture | enforce API/event-only boundaries |
 | Compliance status not treated as a hard gate | unsafe automation | dedicated compliance service and explicit control status model |
-| Model and prompt drift | silent quality decline | version registry, shadow tests, rollback, override monitoring |
+| Prompt or schema drift | silent extraction behavior change | version prompts and schemas, store raw LLM outputs, monitor validation failures and reviewer edits |
 | Human review UX too weak for real operations | low adoption, unsafe overrides | ship viewer, evidence refs, audit trace, and correction flows early |
 | Search/index inconsistency | reviewers see stale state | PostgreSQL remains source of truth; search is read-optimized only |
 | Dependency sprawl in MVP | difficult support model | defer non-essential adapters and advanced retrieval features |
@@ -563,8 +568,8 @@ The design is implementable if the team accepts two constraints:
 1. Split services into independently scalable domains only when queue depth, ownership, or release cadence justify it.
 2. Add more document types through schema/rule packs, not by rewriting the core pipeline.
 3. Expand retrieval, ML scoring, and downstream integrations after the operational loop is stable.
-4. Add HA and DR controls for PostgreSQL, Kafka, Temporal, and object storage before broad enterprise rollout.
-5. Introduce shadow model evaluation, drift monitoring, and controlled canary release for model and prompt changes.
+4. Add HA and DR controls for PostgreSQL, queue infrastructure, worker infrastructure, and object storage before broad enterprise rollout.
+5. Introduce controlled prompt/schema rollout, raw-output retention, and validation-failure monitoring for model and prompt changes.
 
 ### 11.3 Scale-stage trade-offs
 
