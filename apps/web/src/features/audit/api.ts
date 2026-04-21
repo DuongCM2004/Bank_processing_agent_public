@@ -73,3 +73,25 @@ export function listCaseAuditEvents(params: ListCaseAuditEventsParams) {
       }),
     );
 }
+
+export function listAuditEventsByUuid(entityUuid: string, params: Omit<ListCaseAuditEventsParams, "caseId"> = {}) {
+  const limit = params.limit ?? 50;
+  const offset = params.offset ?? 0;
+
+  return apiClient
+    .get<BackendAuditEventListResponse>(`/audit/${entityUuid}`, {
+      limit,
+      offset,
+      event_type: params.eventType,
+      actor_type: params.actorType,
+      resource_type: params.resourceType,
+    })
+    .then(
+      (response): AuditEventListResponse => ({
+        items: response.items.map(normalizeAuditEvent),
+        total: response.total,
+        limit,
+        offset,
+      }),
+    );
+}
