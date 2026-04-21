@@ -40,6 +40,8 @@ def get_document_service(
 ) -> DocumentService:
     return DocumentService(
         DocumentRepository(db),
+        ProcessingResultRepository(db),
+        ManualReviewRepository(db),
         CaseRepository(db),
         case_service,
         audit_logger,
@@ -54,6 +56,7 @@ def get_processing_service(
 ) -> ProcessingService:
     return ProcessingService(
         CaseRepository(db),
+        DocumentRepository(db),
         ProcessingResultRepository(db),
         case_service,
         audit_logger,
@@ -80,6 +83,8 @@ def get_manual_review_service(
 ) -> ManualReviewService:
     return ManualReviewService(
         ManualReviewRepository(db),
+        DocumentRepository(db),
+        ProcessingResultRepository(db),
         CaseRepository(db),
         case_service,
         audit_logger,
@@ -96,4 +101,3 @@ ProcessingServiceDep = Annotated[ProcessingService, Depends(get_processing_servi
 DecisionServiceDep = Annotated[DecisionService, Depends(get_decision_service)]
 ManualReviewServiceDep = Annotated[ManualReviewService, Depends(get_manual_review_service)]
 AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
-
