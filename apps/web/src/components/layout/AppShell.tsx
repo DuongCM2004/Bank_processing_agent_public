@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 const navigation = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/cases", label: "Cases" },
+  { to: "/documents", label: "Documents" },
   { to: "/manual-review", label: "Manual Review" },
   { to: "/audit", label: "Audit Trail" },
   { to: "/settings", label: "Settings" },

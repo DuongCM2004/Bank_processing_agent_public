@@ -5,6 +5,7 @@ import { AuditTrailPage } from "@/pages/audit/AuditTrailPage";
 import { CaseDetailPage } from "@/pages/cases/CaseDetailPage";
 import { CaseListPage } from "@/pages/cases/CaseListPage";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
+import { DocumentIntakePage } from "@/pages/documents/DocumentIntakePage";
 import { NotFoundPage } from "@/pages/not-found/NotFoundPage";
 import { ManualReviewQueuePage } from "@/pages/review/ManualReviewQueuePage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: "cases", element: <CaseListPage /> },
       { path: "cases/:caseId", element: <CaseDetailPage /> },
+      { path: "documents", element: <DocumentIntakePage /> },
       { path: "manual-review", element: <ManualReviewQueuePage /> },
       { path: "audit", element: <AuditTrailPage /> },
       { path: "settings", element: <SettingsPage /> },

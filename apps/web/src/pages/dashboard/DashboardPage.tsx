@@ -33,6 +33,17 @@ export function DashboardPage() {
         ))}
       </div>
 
+      <Card title="Document intake" description="Upload and list documents for an existing case.">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm leading-6 text-slate">
+            Documents are uploaded per case. Open the document intake page, choose a case, then upload files and review stored document records.
+          </p>
+          <Link to="/documents" className="inline-flex shrink-0 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b1b2b]">
+            Upload documents
+          </Link>
+        </div>
+      </Card>
+
       <Card
         title="Recent cases"
         description="Latest visible cases across the operational queue."
