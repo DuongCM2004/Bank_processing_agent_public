@@ -12,6 +12,8 @@ def test_settings_expose_structured_views() -> None:
         ai_provider_mode="external",
         ai_provider_endpoint="https://ai-provider.example.test",
         ai_provider_api_key="placeholder-secret",
+        openai_api_key="openai-secret",
+        gpt_model="gpt-4.1",
         allowed_upload_mime_types="application/pdf,image/png",
         storage_blob_endpoint="https://blob.example.test",
         storage_blob_bucket="ops-agent-documents",
@@ -23,6 +25,8 @@ def test_settings_expose_structured_views() -> None:
     assert settings.worker.task_queue_name == "ops-agent-default"
     assert settings.ai.provider_mode == "external"
     assert settings.ai.provider_endpoint == "https://ai-provider.example.test"
+    assert settings.ai.openai_api_key == "openai-secret"
+    assert settings.ai.gpt_model == "gpt-4.1"
     assert settings.storage.allowed_mime_types == ["application/pdf", "image/png"]
     assert settings.storage.blob_bucket == "ops-agent-documents"
 

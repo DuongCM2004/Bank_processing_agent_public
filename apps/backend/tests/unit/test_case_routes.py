@@ -173,6 +173,35 @@ def test_update_case_status_uses_safe_workflow_service(client) -> None:
     assert "queued_for_processing" in error["message"]
 
 
+def test_queue_case_processing_can_run_extraction_synchronously(client, db_session) -> None:
+    create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
+    case_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"/api/v1/cases/{case_id}/documents",
+        data={"document_type": "passport"},
+        files={"file": ("passport.pdf", b"Passport No: P1234567\nName: Alice Example", "application/pdf")},
+    )
+
+    response = client.post(
+        f"/api/v1/cases/{case_id}/processing/queue",
+        json={
+            "actor_id": "document-intake-ui",
+            "reason_code": "manual_llm_extraction_requested",
+            "run_synchronously": True,
+        },
+    )
+
+    assert upload_response.status_code == 201
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["case_id"] == case_id
+    assert payload["status"] == "decision_ready"
+    assert payload["processed_document_count"] == 1
+    assert db_session.query(OCRResult).count() == 1
+    assert db_session.query(ExtractionResult).count() == 1
+
+
 def test_upload_document_endpoint_persists_file_and_metadata(client, db_session, test_settings) -> None:
     create_response = client.post("/api/v1/cases", json=_case_payload(with_document=False))
     case_id = create_response.json()["id"]
@@ -341,6 +370,125 @@ def test_get_case_document_returns_document_metadata(client) -> None:
     assert payload["id"] == document_id
     assert payload["case_id"] == case_id
     assert payload["filename"] == "statement.pdf"
+
+
+def test_get_document_extraction_returns_latest_review_fields(client, db_session) -> None:
+    now = datetime.now(UTC)
+    case = Case(
+        case_reference="CASE-DOC-EXTRACTION-1",
+        case_type="kyc_onboarding",
+        status=CaseStatus.EXTRACTION_COMPLETED,
+        status_changed_at=now,
+        current_queue="document_ops",
+        source_channel="manual_upload",
+    )
+    db_session.add(case)
+    db_session.flush()
+    document = Document(
+        case_id=case.id,
+        filename="id-card.png",
+        document_type="national_id",
+        mime_type="image/png",
+        storage_key="cases/doc-extraction/id-card.png",
+        sha256_digest="c" * 64,
+        file_size_bytes=2048,
+        uploaded_at=now,
+        status=DocumentStatus.EXTRACTION_COMPLETED,
+        status_changed_at=now,
+        source_channel="manual_upload",
+    )
+    db_session.add(document)
+    db_session.flush()
+    db_session.add(
+        ExtractionResult(
+            document_id=document.id,
+            status=ProcessingStatus.COMPLETED,
+            schema_name="identity-document-v1",
+            extracted_payload={"document_type": "national_id", "full_name": "Alice Example", "document_number": "ID123456"},
+            confidence_score=0.91,
+            evidence_refs=[],
+            provider_name="placeholder_extraction",
+            processed_at=now,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/v1/documents/{document.id}/extraction")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["document_uuid"] == str(document.id)
+    assert payload["status"] == "extraction_completed"
+    field_values = {field["field_name"]: field["extracted_value"] for field in payload["fields"]}
+    assert field_values["full_name"] == "Alice Example"
+    assert field_values["document_number"] == "ID123456"
+
+
+def test_review_document_updates_payload_status_and_audit(client, db_session) -> None:
+    now = datetime.now(UTC)
+    case = Case(
+        case_reference="CASE-DOC-REVIEW-1",
+        case_type="kyc_onboarding",
+        status=CaseStatus.MANUAL_REVIEW_REQUIRED,
+        status_changed_at=now,
+        current_queue="document_ops",
+        source_channel="manual_upload",
+    )
+    db_session.add(case)
+    db_session.flush()
+    document = Document(
+        case_id=case.id,
+        filename="id-card.png",
+        document_type="national_id",
+        mime_type="image/png",
+        storage_key="cases/doc-review/id-card.png",
+        sha256_digest="d" * 64,
+        file_size_bytes=2048,
+        uploaded_at=now,
+        status=DocumentStatus.REVIEW_REQUIRED,
+        status_changed_at=now,
+        source_channel="manual_upload",
+    )
+    db_session.add(document)
+    db_session.flush()
+    extraction_result = ExtractionResult(
+        document_id=document.id,
+        status=ProcessingStatus.COMPLETED,
+        schema_name="identity-document-v1",
+        extracted_payload={"document_type": "national_id", "full_name": "Alice Example"},
+        confidence_score=0.91,
+        evidence_refs=[],
+        provider_name="placeholder_extraction",
+        processed_at=now,
+    )
+    db_session.add(extraction_result)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/v1/documents/{document.id}/review",
+        json={
+            "action": "approve",
+            "reviewer_id": "reviewer-ui",
+            "reviewed_payload": {
+                "document_type": "national_id",
+                "full_name": "Alice Reviewer",
+                "document_number": "ID123456",
+            },
+            "comment": "Verified against source image.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["document_uuid"] == str(document.id)
+    assert payload["status"] == "approved"
+    db_session.refresh(document)
+    db_session.refresh(extraction_result)
+    assert document.status == DocumentStatus.APPROVED
+    assert extraction_result.extracted_payload["full_name"] == "Alice Reviewer"
+    assert extraction_result.extracted_payload["document_number"] == "ID123456"
+    audits = db_session.query(AuditEvent).filter(AuditEvent.resource_id == document.id).all()
+    assert any(event.event_type == AuditEventType.MANUAL_REVIEW_ACTION_RECORDED for event in audits)
 
 
 def test_download_document_returns_content_and_emits_audit_event(client, db_session) -> None:

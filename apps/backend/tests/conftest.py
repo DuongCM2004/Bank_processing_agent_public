@@ -59,7 +59,11 @@ def test_database_strategy(test_database_backend: str) -> str:
 @pytest.fixture
 def test_settings() -> AppSettings:
     upload_root = Path(".runtime") / "test-uploads" / uuid4().hex
+    # `_env_file=None` prevents pydantic-settings from merging the repo-root
+    # `.env` (which is tuned for the ID-card demo and narrows mime types).
+    # Tests should depend only on the defaults + explicit kwargs below.
     settings = AppSettings(
+        _env_file=None,
         env="test",
         debug=False,
         postgres_dsn="postgresql+psycopg://ops_agent:ops_agent@localhost:5432/ops_agent_test",
