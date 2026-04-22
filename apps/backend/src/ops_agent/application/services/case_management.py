@@ -185,6 +185,13 @@ class CaseManagementService:
             offset=offset,
         )
 
+    def delete_case(self, case_id: UUID) -> None:
+        case = self._repository.get_by_id(case_id)
+        if case is None:
+            raise ResourceNotFoundError("Case", str(case_id))
+        self._repository.delete(case)
+        self._repository.commit()
+
     def update_case_status(self, *, case_id: UUID, request: UpdateCaseStatusRequest) -> UpdateCaseStatusResponse:
         case = self._repository.get_by_id(case_id)
         if case is None:

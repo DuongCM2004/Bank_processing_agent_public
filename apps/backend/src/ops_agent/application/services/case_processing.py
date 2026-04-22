@@ -413,8 +413,15 @@ class CaseProcessingService:
                 document_type=effective_document_type,
                 filename=document.filename,
                 raw_text=ocr_result.raw_text or "",
+                mime_type=document.mime_type,
+                content=content,
             )
         )
+        effective_document_type = self._resolve_extracted_document_type(
+            current_document_type=effective_document_type,
+            extracted_payload=extraction_response.extracted_payload,
+        )
+        document.document_type = effective_document_type
         extraction_at = datetime.now(UTC)
         extraction_result = ExtractionResult(
             document_id=document.id,
@@ -466,8 +473,8 @@ class CaseProcessingService:
                         extraction_result_id=artifact.extraction_result.id,
                         document_type=artifact.effective_document_type,
                         filename=artifact.document.filename,
-                        raw_text=artifact.ocr_result.raw_text or "",
-                        ocr_confidence_score=artifact.ocr_result.confidence_score,
+                        raw_text=self._raw_text_for_validation(artifact),
+                        ocr_confidence_score=self._ocr_confidence_for_validation(artifact),
                         extracted_payload=artifact.extraction_result.extracted_payload,
                         extraction_confidence_score=artifact.extraction_result.confidence_score,
                         evidence_refs=tuple(_evidence_refs_from_records(artifact.extraction_result.evidence_refs)),
@@ -677,6 +684,36 @@ class CaseProcessingService:
         if normalized_current and normalized_current not in {"unknown", "unclassified", "generic_document"}:
             return current_document_type
         return classified_document_type
+
+    @staticmethod
+    def _resolve_extracted_document_type(
+        *,
+        current_document_type: str,
+        extracted_payload: dict[str, object],
+    ) -> str:
+        extracted_document_type = extracted_payload.get("document_type")
+        if not isinstance(extracted_document_type, str) or not extracted_document_type.strip():
+            return current_document_type
+        return CaseProcessingService._resolve_document_type(
+            current_document_type=current_document_type,
+            classified_document_type=extracted_document_type.strip(),
+        )
+
+    @staticmethod
+    def _raw_text_for_validation(artifact: PersistedDocumentArtifacts) -> str:
+        raw_text = artifact.ocr_result.raw_text or ""
+        if raw_text.strip():
+            return raw_text
+        extracted_raw_text = artifact.extraction_result.extracted_payload.get("raw_full_text")
+        if isinstance(extracted_raw_text, str):
+            return extracted_raw_text
+        return ""
+
+    @staticmethod
+    def _ocr_confidence_for_validation(artifact: PersistedDocumentArtifacts) -> float | None:
+        if artifact.ocr_result.provider_name == "openai_vision_ocr_passthrough":
+            return 1.0
+        return artifact.ocr_result.confidence_score
 
 
 def _maybe_uuid(raw: str | None) -> UUID | None:
