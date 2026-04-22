@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ops_agent.infrastructure.db.models import AuditEvent, Case, Document
+from ops_agent.infrastructure.db.models import AuditEvent, Case, Document, ExtractionResult
 
 
 class DocumentRepository:
@@ -22,6 +22,19 @@ class DocumentRepository:
 
     def get_document_by_id(self, case_id: UUID, document_id: UUID) -> Document | None:
         statement = select(Document).where(Document.case_id == case_id, Document.id == document_id)
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def get_document_by_uuid(self, document_id: UUID) -> Document | None:
+        statement = select(Document).where(Document.id == document_id)
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def get_latest_extraction_result(self, document_id: UUID) -> ExtractionResult | None:
+        statement = (
+            select(ExtractionResult)
+            .where(ExtractionResult.document_id == document_id)
+            .order_by(ExtractionResult.created_at.desc())
+            .limit(1)
+        )
         return self._session.execute(statement).scalar_one_or_none()
 
     def add_document(self, document: Document) -> Document:

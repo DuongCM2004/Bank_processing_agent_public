@@ -50,4 +50,20 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(api_router, prefix=app_settings.api.v1_prefix)
+
+    @app.get("/", tags=["system"], include_in_schema=False)
+    def root() -> dict[str, object]:
+        api_base = app_settings.api.v1_prefix.rstrip("/")
+        return {
+            "name": app_settings.app_name,
+            "status": "ok",
+            "environment": app_settings.env,
+            "api_base": api_base,
+            "links": {
+                "health": f"{api_base}/health",
+                "docs": f"{api_base}/docs",
+                "openapi": f"{api_base}/openapi.json",
+            },
+        }
+
     return app

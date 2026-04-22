@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -114,6 +115,63 @@ class DocumentUploadRequest(APIModel):
 class DocumentListResponse(APIModel):
     items: list[DocumentUploadMetadataResponse] = Field(default_factory=list)
     total: int
+
+
+class IdentityDocumentExtractionResponse(APIModel):
+    document_type: str | None = None
+    full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    id_number: str | None = None
+    document_number: str | None = None
+    date_of_birth: str | None = None
+    sex: str | None = None
+    gender: str | None = None
+    nationality: str | None = None
+    place_of_birth: str | None = None
+    issue_date: str | None = None
+    expiry_date: str | None = None
+    issuing_authority: str | None = None
+    address: str | None = None
+    raw_full_text: str | None = None
+
+
+class DocumentStatusResponse(APIModel):
+    document_uuid: UUID
+    status: DocumentStatus
+    extraction_uuid: UUID | None = None
+    extraction_status: ProcessingStatus | None = None
+    updated_at: datetime
+
+
+class DocumentExtractionFieldResponse(APIModel):
+    field_name: str
+    extracted_value: str | None = None
+    reviewed_value: str | None = None
+
+
+class DocumentExtractionResponse(APIModel):
+    document_uuid: UUID
+    extraction_uuid: UUID | None = None
+    status: DocumentStatus
+    fields: list[DocumentExtractionFieldResponse] = Field(default_factory=list)
+    extracted_payload: dict[str, object] = Field(default_factory=dict)
+    reviewed_payload: dict[str, object] | None = None
+    raw_full_text: str | None = None
+
+
+class DocumentReviewRequest(APIModel):
+    action: Literal["edit", "approve", "reject"]
+    reviewer_id: str = Field(..., min_length=1, max_length=128)
+    reviewed_payload: IdentityDocumentExtractionResponse | None = None
+    comment: str | None = Field(default=None, max_length=4000)
+
+
+class DocumentReviewResponse(APIModel):
+    document_uuid: UUID
+    extraction_uuid: UUID | None = None
+    status: DocumentStatus
+    action_id: UUID
 
 
 class CaseCreateRequest(APIModel):
@@ -426,6 +484,25 @@ class UpdateCaseStatusResponse(APIModel):
     status_changed_at: datetime
     updated_at: datetime
     allowed_next_statuses: list[CaseStatus] = Field(default_factory=list)
+
+
+class QueueProcessingRequest(APIModel):
+    actor_id: str | None = Field(default=None, max_length=128)
+    reason_code: str | None = Field(default=None, max_length=100)
+    run_synchronously: bool = False
+
+
+class QueueProcessingResponse(APIModel):
+    case_id: UUID
+    status: CaseStatus
+    correlation_id: str
+    attempt_number: int = Field(..., ge=1)
+    processed_document_count: int | None = Field(default=None, ge=0)
+    validation_finding_count: int | None = Field(default=None, ge=0)
+    risk_finding_count: int | None = Field(default=None, ge=0)
+    compliance_finding_count: int | None = Field(default=None, ge=0)
+    manual_review_required: bool | None = None
+    decision_id: UUID | None = None
 
 
 class CaseDetailResponse(APIModel):

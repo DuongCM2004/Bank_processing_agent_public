@@ -24,6 +24,8 @@ class DocumentStatus(StrEnum):
     OCR_COMPLETED = "ocr_completed"
     EXTRACTION_COMPLETED = "extraction_completed"
     REVIEW_REQUIRED = "review_required"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     FAILED = "failed"
     ARCHIVED = "archived"
 

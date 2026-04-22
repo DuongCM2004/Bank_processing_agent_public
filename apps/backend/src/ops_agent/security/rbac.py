@@ -17,6 +17,7 @@ class Permission(StrEnum):
     DOCUMENT_UPLOAD = "document:upload"
     DOCUMENT_READ = "document:read"
     DOCUMENT_DOWNLOAD = "document:download"
+    PROCESSING_QUEUE = "processing:queue"
     MANUAL_REVIEW_WRITE = "manual_review:write"
     DECISION_WRITE = "decision:write"
     AUDIT_READ = "audit:read"
@@ -31,6 +32,7 @@ ROLE_PERMISSIONS: dict[RoleCode, frozenset[Permission]] = {
             Permission.DOCUMENT_UPLOAD,
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_DOWNLOAD,
+            Permission.PROCESSING_QUEUE,
         }
     ),
     RoleCode.REVIEWER: frozenset(
@@ -41,6 +43,7 @@ ROLE_PERMISSIONS: dict[RoleCode, frozenset[Permission]] = {
             Permission.DOCUMENT_UPLOAD,
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_DOWNLOAD,
+            Permission.PROCESSING_QUEUE,
             Permission.MANUAL_REVIEW_WRITE,
             Permission.DECISION_WRITE,
             Permission.AUDIT_READ,

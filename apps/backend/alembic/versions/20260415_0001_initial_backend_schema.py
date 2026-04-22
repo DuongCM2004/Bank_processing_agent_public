@@ -39,6 +39,8 @@ document_status_enum = sa.Enum(
     "ocr_completed",
     "extraction_completed",
     "review_required",
+    "approved",
+    "rejected",
     "failed",
     "archived",
     name="documentstatus",

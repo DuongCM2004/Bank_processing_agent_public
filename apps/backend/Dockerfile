@@ -3,7 +3,7 @@ FROM python:3.13-slim AS dev
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONPATH=/app/apps/backend
+    PYTHONPATH=/app/apps/backend/src
 
 WORKDIR /app/apps/backend
 
@@ -14,8 +14,8 @@ RUN python -m pip install --upgrade pip \
 
 COPY apps/backend/alembic.ini ./alembic.ini
 COPY apps/backend/alembic ./alembic
-COPY apps/backend/app ./app
+COPY apps/backend/src ./src
 
 EXPOSE 8003
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
+CMD ["python", "-m", "uvicorn", "ops_agent.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]

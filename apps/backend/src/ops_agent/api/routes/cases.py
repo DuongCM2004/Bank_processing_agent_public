@@ -90,6 +90,19 @@ def get_case_detail(case_id: UUID, case_service: CaseManagementServiceDep) -> Ca
     return case_service.get_case_detail(case_id)
 
 
+@router.delete(
+    "/{case_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete case",
+    description="Deletes a case and all associated documents, extraction results, findings, decisions, manual review actions, and audit events.",
+    operation_id="deleteCase",
+    responses=error_responses(401, 403, 404, 422, 500),
+    dependencies=[Depends(require_permission(Permission.ADMIN_MANAGE))],
+)
+def delete_case(case_id: UUID, case_service: CaseManagementServiceDep) -> None:
+    case_service.delete_case(case_id)
+
+
 @router.patch(
     "/{case_id}/status",
     response_model=UpdateCaseStatusResponse,

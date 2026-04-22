@@ -32,10 +32,17 @@ class WorkerSettings(BaseModel):
 
 
 class AIIntegrationSettings(BaseModel):
-    provider_mode: Literal["placeholder", "disabled", "external"] = "placeholder"
+    provider_mode: Literal["placeholder", "disabled", "external", "gpt"] = "placeholder"
     provider_endpoint: str | None = None
     provider_api_key: str | None = Field(default=None, repr=False)
     provider_timeout_seconds: int = 30
+    openai_api_key: str | None = Field(default=None, repr=False)
+    gpt_model: str = "gpt-4.1"
+    openai_store_response: bool = False
+    llm_prompt_version: str = "identity-document-extraction-v1"
+    llm_schema_version: str = "identity-document-v1"
+    image_max_dimension_px: int = 1600
+    image_jpeg_quality: int = 90
 
 
 class ProcessingSettings(BaseModel):
@@ -81,10 +88,17 @@ class AppSettings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
     task_queue_name: str = "ops-agent-default"
-    ai_provider_mode: Literal["placeholder", "disabled", "external"] = "placeholder"
+    ai_provider_mode: Literal["placeholder", "disabled", "external", "gpt"] = "placeholder"
     ai_provider_endpoint: str | None = None
     ai_provider_api_key: str | None = Field(default=None, repr=False)
     ai_provider_timeout_seconds: int = 30
+    openai_api_key: str | None = Field(default=None, repr=False)
+    gpt_model: str = "gpt-4.1"
+    openai_store_response: bool = False
+    llm_prompt_version: str = "identity-document-extraction-v1"
+    llm_schema_version: str = "identity-document-v1"
+    image_max_dimension_px: int = 1600
+    image_jpeg_quality: int = 90
     processing_max_retry_attempts: int = 3
     processing_min_ocr_confidence: float = 0.75
     processing_min_extraction_confidence: float = 0.8
@@ -143,6 +157,13 @@ class AppSettings(BaseSettings):
             provider_endpoint=self.ai_provider_endpoint,
             provider_api_key=self.ai_provider_api_key,
             provider_timeout_seconds=self.ai_provider_timeout_seconds,
+            openai_api_key=self.openai_api_key or self.ai_provider_api_key,
+            gpt_model=self.gpt_model,
+            openai_store_response=self.openai_store_response,
+            llm_prompt_version=self.llm_prompt_version,
+            llm_schema_version=self.llm_schema_version,
+            image_max_dimension_px=self.image_max_dimension_px,
+            image_jpeg_quality=self.image_jpeg_quality,
         )
 
     @property

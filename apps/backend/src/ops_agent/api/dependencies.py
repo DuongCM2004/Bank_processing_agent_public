@@ -25,6 +25,8 @@ from ops_agent.domain.shared.exceptions import OpsAgentError
 from ops_agent.infrastructure.db.repositories import AuditRepository, CaseRepository, DecisionRepository, ManualReviewRepository, ProcessingRepository
 from ops_agent.infrastructure.db.repositories.document_repository import DocumentRepository
 from ops_agent.infrastructure.providers import (
+    OpenAIIdentityExtractionProvider,
+    OpenAIVisionOCRProvider,
     PlaceholderDocumentClassificationProvider,
     PlaceholderExtractionProvider,
     PlaceholderOCRProvider,
@@ -131,6 +133,8 @@ def get_document_access_service(
 def get_ocr_provider(settings: Annotated[AppSettings, Depends(get_app_settings)]) -> OCRProvider:
     if settings.ai.provider_mode == "placeholder":
         return PlaceholderOCRProvider()
+    if settings.ai.provider_mode == "gpt":
+        return OpenAIVisionOCRProvider()
     raise OpsAgentError(
         f"OCR provider mode '{settings.ai.provider_mode}' is not configured.",
         error_code="unsupported_ocr_provider_mode",
@@ -141,6 +145,8 @@ def get_ocr_provider(settings: Annotated[AppSettings, Depends(get_app_settings)]
 def get_extraction_provider(settings: Annotated[AppSettings, Depends(get_app_settings)]) -> ExtractionProvider:
     if settings.ai.provider_mode == "placeholder":
         return PlaceholderExtractionProvider()
+    if settings.ai.provider_mode == "gpt":
+        return OpenAIIdentityExtractionProvider(settings.ai)
     raise OpsAgentError(
         f"Extraction provider mode '{settings.ai.provider_mode}' is not configured.",
         error_code="unsupported_extraction_provider_mode",
@@ -151,7 +157,7 @@ def get_extraction_provider(settings: Annotated[AppSettings, Depends(get_app_set
 def get_document_classification_provider(
     settings: Annotated[AppSettings, Depends(get_app_settings)],
 ) -> DocumentClassificationProvider:
-    if settings.ai.provider_mode == "placeholder":
+    if settings.ai.provider_mode in {"placeholder", "gpt"}:
         return PlaceholderDocumentClassificationProvider()
     raise OpsAgentError(
         f"Document classification provider mode '{settings.ai.provider_mode}' is not configured.",
@@ -161,7 +167,7 @@ def get_document_classification_provider(
 
 
 def get_validation_rules_engine(settings: Annotated[AppSettings, Depends(get_app_settings)]) -> ValidationRulesEngine:
-    if settings.ai.provider_mode == "placeholder":
+    if settings.ai.provider_mode in {"placeholder", "gpt"}:
         return PlaceholderValidationRulesEngine()
     raise OpsAgentError(
         f"Validation rules engine mode '{settings.ai.provider_mode}' is not configured.",

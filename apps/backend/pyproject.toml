@@ -30,15 +30,15 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["app*"]
+where = ["src"]
+include = ["ops_agent*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["app/tests"]
+pythonpath = ["src"]
+testpaths = ["tests"]
 addopts = ["--strict-markers"]
 markers = [
   "unit: fast isolated unit-level coverage",

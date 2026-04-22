@@ -86,6 +86,9 @@ class CaseRepository:
         total = int(self._session.execute(count_statement).scalar_one())
         return items, total
 
+    def delete(self, case: Case) -> None:
+        self._session.delete(case)
+
     def flush(self) -> None:
         self._session.flush()
 

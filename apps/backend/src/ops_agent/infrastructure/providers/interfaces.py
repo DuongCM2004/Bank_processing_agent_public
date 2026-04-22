@@ -42,6 +42,8 @@ class ExtractionProviderRequest:
     document_type: str
     filename: str
     raw_text: str
+    mime_type: str | None = None
+    content: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -22,6 +22,10 @@ from ops_agent.infrastructure.providers.placeholder import (
     PlaceholderOCRProvider,
     PlaceholderValidationRulesEngine,
 )
+from ops_agent.infrastructure.providers.openai_extraction import (
+    OpenAIIdentityExtractionProvider,
+    OpenAIVisionOCRProvider,
+)
 
 __all__ = [
     "ComplianceFindingResult",
@@ -34,6 +38,8 @@ __all__ = [
     "OCRProvider",
     "OCRProviderRequest",
     "OCRProviderResult",
+    "OpenAIIdentityExtractionProvider",
+    "OpenAIVisionOCRProvider",
     "PlaceholderDocumentClassificationProvider",
     "PlaceholderExtractionProvider",
     "PlaceholderOCRProvider",
