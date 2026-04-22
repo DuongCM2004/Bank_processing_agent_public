@@ -1,29 +1,10 @@
 [project]
 name = "bank-document-processing-agent"
 version = "0.1.0"
-description = "Banking-grade document processing agent MVP backend foundation."
+description = "Banking-grade document processing agent MVP — monorepo root (real package lives in apps/backend)."
 requires-python = ">=3.13"
-dependencies = [
-  "fastapi>=0.115.0,<1.0.0",
-  "uvicorn[standard]>=0.30.0,<1.0.0",
-  "pydantic>=2.9.0,<3.0.0",
-]
 
-[project.optional-dependencies]
-dev = [
-  "httpx>=0.27.0,<1.0.0",
-  "pytest>=8.3.0,<9.0.0",
-]
-
-[build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+# NOTE: This root pyproject.toml is a workspace marker only.
+# The actual backend package, dependencies, build config, and pytest config
+# live in apps/backend/pyproject.toml. Run tests via:
+#   cd apps/backend && pytest

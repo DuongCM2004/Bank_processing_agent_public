@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/web
+        working-directory: apps/frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4

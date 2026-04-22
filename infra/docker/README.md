@@ -23,7 +23,7 @@ Open:
 - `postgres_data`: local PostgreSQL data.
 - `redis_data`: local Redis append-only data.
 - `backend_uploads`: uploaded document files for local development.
-- `web_node_modules`: frontend dependencies installed inside the container.
+- `frontend_node_modules`: frontend dependencies installed inside the container.
 
 To reset local state:
 

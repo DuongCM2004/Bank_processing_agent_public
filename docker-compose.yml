@@ -56,7 +56,7 @@ services:
     working_dir: /app/apps/backend
     command: >
       sh -c "python -m alembic upgrade head &&
-             python -m uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload"
+             python -m uvicorn ops_agent.main:app --host 0.0.0.0 --port 8003 --reload"
     ports:
       - "8003:8003"
     volumes:
@@ -82,21 +82,21 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: apps/frontend/Dockerfile
       target: dev
     container_name: ops-agent-frontend
     env_file:
-      - ./apps/web/.env.example
+      - ./apps/frontend/.env.example
     environment:
       VITE_OPS_AGENT_API_BASE_URL: http://localhost:8003/api/v1
       CHOKIDAR_USEPOLLING: "true"
-    working_dir: /app/apps/web
+    working_dir: /app/apps/frontend
     command: npm run dev -- --host 0.0.0.0
     ports:
       - "5173:5173"
     volumes:
-      - ./apps/web:/app/apps/web
-      - web_node_modules:/app/apps/web/node_modules
+      - ./apps/frontend:/app/apps/frontend
+      - frontend_node_modules:/app/apps/frontend/node_modules
     depends_on:
       backend:
         condition: service_started
@@ -107,7 +107,7 @@ volumes:
   postgres_data:
   redis_data:
   backend_uploads:
-  web_node_modules:
+  frontend_node_modules:
 
 networks:
   ops_agent_local:

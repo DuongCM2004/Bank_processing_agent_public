@@ -1,30 +1,28 @@
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
-import { AppLayout } from "@/layouts/AppLayout";
-import { CaseDetailPage } from "@/pages/case-detail/CaseDetailPage";
+import { AppShell } from "@/components/layout/AppShell";
+import { AuditTrailPage } from "@/pages/audit/AuditTrailPage";
+import { CaseDetailPage } from "@/pages/cases/CaseDetailPage";
 import { CaseListPage } from "@/pages/cases/CaseListPage";
-import { ManualReviewQueuePage } from "@/pages/cases/ManualReviewQueuePage";
-import { StateBlock } from "@/components/ui/StateBlock";
+import { DashboardPage } from "@/pages/dashboard/DashboardPage";
+import { DocumentIntakePage } from "@/pages/documents/DocumentIntakePage";
+import { NotFoundPage } from "@/pages/not-found/NotFoundPage";
+import { ManualReviewQueuePage } from "@/pages/review/ManualReviewQueuePage";
+import { SettingsPage } from "@/pages/settings/SettingsPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <AppLayout />,
+    element: <AppShell />,
     children: [
-      { index: true, element: <Navigate to="/cases" replace /> },
+      { index: true, element: <DashboardPage /> },
       { path: "cases", element: <CaseListPage /> },
       { path: "cases/:caseId", element: <CaseDetailPage /> },
+      { path: "documents", element: <DocumentIntakePage /> },
       { path: "manual-review", element: <ManualReviewQueuePage /> },
-      {
-        path: "*",
-        element: (
-          <StateBlock
-            state="empty"
-            title="Page not found"
-            message="The requested operations view is not registered in the frontend router."
-          />
-        ),
-      },
+      { path: "audit", element: <AuditTrailPage /> },
+      { path: "settings", element: <SettingsPage /> },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);

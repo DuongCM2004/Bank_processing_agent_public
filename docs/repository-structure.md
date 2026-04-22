@@ -165,37 +165,37 @@ Current top-level implementation assets such as `src/`, `frontend/`, `contracts/
 
 ## Frontend Folder Structure
 
-`apps/web/src/app/`
+`apps/frontend/src/app/`
 
 - Vite entrypoint composition, route shells, top-level layout wiring, and page-level assembly.
 
-`apps/web/src/features/`
+`apps/frontend/src/features/`
 
 - Feature slices such as `case-intake`, `review-queue`, `case-workspace`, `audit-trail`, and `manual-decision`.
 - Each feature owns its tables, detail panels, API hooks, and status presentation helpers.
 
-`apps/web/src/components/`
+`apps/frontend/src/components/`
 
 - Shared UI building blocks used across multiple features.
 - Keep business rules out of generic components.
 
-`apps/web/src/api/`
+`apps/frontend/src/api/`
 
 - API clients, request helpers, response mappers, and typed transport contracts.
 
-`apps/web/src/lib/`
+`apps/frontend/src/lib/`
 
 - Reusable non-UI helpers such as formatting, polling helpers, and table state utilities.
 
-`apps/web/src/types/`
+`apps/frontend/src/types/`
 
 - Shared frontend-only view models and contract-derived types.
 
-`apps/web/src/styles/`
+`apps/frontend/src/styles/`
 
 - Tailwind entrypoints, tokens, and app-level stylesheet composition.
 
-`apps/web/tests/`
+`apps/frontend/tests/`
 
 - `unit/`: component and hook tests.
 - `integration/`: feature flow and API mocking tests.
@@ -263,7 +263,7 @@ Current top-level implementation assets such as `src/`, `frontend/`, `contracts/
 
 Use two test layers:
 
-- app-local tests inside `apps/backend`, `apps/web`, and `apps/worker`
+- app-local tests inside `apps/backend` and `apps/frontend`
 - system-level end-to-end tests inside `tests/e2e`
 
 This keeps most feedback loops close to the owning code while preserving a place for true cross-runtime verification.
