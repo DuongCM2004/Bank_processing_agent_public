@@ -103,9 +103,9 @@ class DocumentAccessService:
     def review_document(self, *, document_id: UUID, request: DocumentReviewRequest) -> DocumentReviewResponse:
         document = self._get_document_by_uuid_or_raise(document_id)
         extraction_result = self._repository.get_latest_extraction_result(document.id)
-        if extraction_result is None and request.action != "reject":
+        if extraction_result is None and request.action == "edit":
             raise ConflictError(
-                f"Document '{document_id}' has no extraction result to review.",
+                f"Document '{document_id}' has no extraction result to edit.",
                 error_code="document_has_no_extraction_result",
             )
 

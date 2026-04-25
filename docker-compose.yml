@@ -45,7 +45,7 @@ services:
       target: dev
     container_name: ops-agent-backend
     env_file:
-      - ./apps/backend/.env.example
+      - ./apps/backend/.env
     environment:
       OPS_AGENT_ENV: local
       OPS_AGENT_DEBUG: "true"

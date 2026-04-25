@@ -1,39 +1,47 @@
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ApiError } from "@/api/errors";
 import { AsyncContent } from "@/components/ui/AsyncContent";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CaseStatusBadge } from "@/features/cases/components/CaseStatusBadge";
-import { useCasesQuery, useCaseWorkspaceQuery, useDeleteCaseMutation } from "@/features/cases/hooks";
+import {
+  useCasesQuery,
+  useCaseWorkspaceQuery,
+  useCreateCaseMutation,
+  useDeleteCaseMutation,
+} from "@/features/cases/hooks";
 import { DocumentManagementPanel } from "@/features/documents/components/DocumentManagementPanel";
 
 export function DocumentIntakePage() {
   const casesQuery = useCasesQuery({ limit: 8, offset: 0 });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [caseIdInput, setCaseIdInput] = useState("");
   const [selectedCaseId, setSelectedCaseId] = useState<string | undefined>(undefined);
   const [selectedLocalFile, setSelectedLocalFile] = useState<File | null>(null);
   const caseWorkspaceQuery = useCaseWorkspaceQuery(selectedCaseId);
   const deleteCaseMutation = useDeleteCaseMutation();
+  const createCaseMutation = useCreateCaseMutation();
+  const [createdCaseId, setCreatedCaseId] = useState<string | null>(null);
+  const [createdCaseReference, setCreatedCaseReference] = useState<string | null>(null);
   const recentCases = casesQuery.data?.items ?? [];
 
   useEffect(() => {
     if (selectedCaseId && recentCases.length > 0 && !recentCases.some((item) => item.id === selectedCaseId)) {
       setSelectedCaseId(undefined);
-      setCaseIdInput("");
     }
   }, [recentCases, selectedCaseId]);
 
   function selectCase(caseId: string) {
     setSelectedCaseId(caseId);
-    setCaseIdInput(caseId);
   }
 
   async function handleDeleteCase(caseId: string, caseReference: string) {
-    const confirmed = window.confirm(`Delete case ${caseReference}? This removes all associated documents, extractions, and audit events.`);
+    const confirmed = window.confirm(
+      `Delete case ${caseReference}? This removes all associated documents, extractions, and audit events.`,
+    );
     if (!confirmed) {
       return;
     }
@@ -42,59 +50,114 @@ export function DocumentIntakePage() {
       await deleteCaseMutation.mutateAsync(caseId);
       if (selectedCaseId === caseId) {
         setSelectedCaseId(undefined);
-        setCaseIdInput("");
       }
     } catch {
       window.alert("Case could not be deleted. Please try again.");
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSelectedCaseId(caseIdInput.trim() || undefined);
+  async function handleFileInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedLocalFile(file);
+    createCaseMutation.reset();
+    setCreatedCaseId(null);
+    setCreatedCaseReference(null);
+    if (!file) return;
+
+    try {
+      const created = await createCaseMutation.mutateAsync({
+        case_reference: `CASE-${Date.now()}`,
+        case_type: "identity_document",
+        source_channel: "manual_upload",
+        current_queue: "document_ops",
+        case_metadata: {
+          source_filename: file.name,
+          source_mime_type: file.type || "application/octet-stream",
+          source_size_bytes: String(file.size),
+        },
+      });
+      setCreatedCaseId(created.id);
+      setCreatedCaseReference(created.case_reference);
+    } catch {
+      // error surfaces via mutation state below
+    }
   }
 
-  function handleFileInputChange(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedLocalFile(event.target.files?.[0] ?? null);
-  }
+  const createError = createCaseMutation.error;
+  const createErrorMessage =
+    createError instanceof ApiError
+      ? createError.message
+      : createError instanceof Error
+        ? createError.message
+        : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Documents"
         title="Document intake"
-        description="Upload documents and review stored document records for a selected case."
+        description="Load a document to open a new case. Extraction runs as the next step after the case is created."
       />
 
       <Card
         title="Select case"
-        description="Documents are attached to a case. Choose an existing case first, then upload and extract in the intake panel."
+        description="Load a file to create a new case, or pick an existing case from the list below."
       >
         <div className="space-y-5">
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.txt,.csv,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={handleFileInputChange}
+            onChange={(event) => void handleFileInputChange(event)}
             className="sr-only"
           />
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:flex-row">
-            <input
-              value={caseIdInput}
-              onChange={(event) => setCaseIdInput(event.target.value)}
-              placeholder="Enter case UUID"
-              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none ring-accent transition focus:ring-2"
-            />
-            <Button type="submit">Load documents</Button>
-            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              Stage local file
+          <div className="flex flex-col gap-3 md:flex-row">
+            <Button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={createCaseMutation.isPending}
+            >
+              {createCaseMutation.isPending ? "Creating case..." : "Load documents"}
             </Button>
-          </form>
+          </div>
+
           {selectedLocalFile ? (
-            <p className="rounded-xl bg-mist px-3 py-2 text-sm text-slate">
-              Staged local file: <span className="font-semibold text-ink">{selectedLocalFile.name}</span>
-              {selectedCaseId ? " It is ready in the upload form below." : " Select a case to show the upload form."}
-            </p>
+            <div className="space-y-3 rounded-xl bg-mist px-3 py-3 text-sm text-slate">
+              <p>
+                Loaded file: <span className="font-semibold text-ink">{selectedLocalFile.name}</span>
+              </p>
+
+              {createErrorMessage ? (
+                <p className="rounded-lg bg-dangerSoft px-3 py-2 text-xs text-danger">
+                  Case could not be created: {createErrorMessage}
+                </p>
+              ) : null}
+
+              {createdCaseId ? (
+                <div className="rounded-lg bg-accentSoft px-3 py-2 text-xs text-ink">
+                  <p className="font-semibold text-accent">Case created</p>
+                  <p className="mt-1">
+                    Reference: <span className="font-semibold">{createdCaseReference}</span>
+                  </p>
+                  <p className="mt-1 font-mono">UUID: {createdCaseId}</p>
+                  <div className="mt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => selectCase(createdCaseId)}
+                      className="font-semibold text-accent underline-offset-4 hover:underline"
+                    >
+                      Open in intake panel
+                    </button>
+                    <Link
+                      to={`/cases/${createdCaseId}`}
+                      className="font-semibold text-accent underline-offset-4 hover:underline"
+                    >
+                      View case detail & audit trail
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           <AsyncContent
@@ -103,7 +166,7 @@ export function DocumentIntakePage() {
             errorMessage="Recent cases could not be loaded."
             isEmpty={recentCases.length === 0}
             emptyTitle="No cases available"
-            emptyMessage="Create a case first, then return here to upload documents."
+            emptyMessage="Load a document above to create your first case."
             onRetry={() => void casesQuery.refetch()}
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

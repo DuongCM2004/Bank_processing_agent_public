@@ -93,7 +93,7 @@ export function AuditHistoryPanel({
                   <p className="shrink-0 text-xs text-slate">{new Date(event.occurred_at).toLocaleString()}</p>
                 </div>
 
-                {Object.keys(event.metadata).length > 0 ? (
+                {event.metadata && Object.keys(event.metadata).length > 0 ? (
                   <details className="mt-3 rounded-xl border border-dashed border-line bg-mist/70 px-3 py-3">
                     <summary className="cursor-pointer list-none text-sm font-medium text-ink">
                       Metadata preview
