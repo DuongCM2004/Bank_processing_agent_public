@@ -62,3 +62,7 @@ py -m pytest
 
 The repo now includes a target MVP-first monorepo scaffold under `apps/`, `packages/`, `infra/`, and `tooling/`.
 Use [docs/repository-structure.md](docs/repository-structure.md) as the source of truth for folder ownership, naming conventions, and migration targets.
+
+## Demo
+
+Watch demo here: [Project Demo](https://youtu.be/Wz2VC6cVUlc)
