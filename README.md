@@ -65,4 +65,4 @@ Use [docs/repository-structure.md](docs/repository-structure.md) as the source o
 
 ## Demo
 
-[![Watch the demo](https://img.youtube.com/vi/844PNgAJT_g/0.jpg)](https://youtu.be/844PNgAJT_g)
+[![Watch the demo](https://img.youtube.com/vi/Wz2VC6cVUlc/0.jpg)](https://youtu.be/Wz2VC6cVUlc)
