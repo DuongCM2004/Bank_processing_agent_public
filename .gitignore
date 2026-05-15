@@ -46,3 +46,15 @@ infra/environments/*.secrets.env
 
 # Runtime generated
 .runtime/
+
+# Personal config / memory
+.claude/
+.remember/
+
+# Working scratch / dumps
+full_diff.txt
+status.txt
+
+# Large demo media (host externally)
+*.mp4
+demo_id_card*.png
